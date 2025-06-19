@@ -23,11 +23,35 @@ const App = () => {
   const body = useEmailBody();
   const enhancement = useEnhancement(body);
 
+  const handleConfirm = () => {
+    const formattedHtml = `
+      <p>${enhancement.responseText.replace(/\n/g, "<br>")}</p>
+    `;
+
+    Office.context.mailbox.item.body.setAsync(formattedHtml, { coercionType: "html" });
+    enhancement.setResponseHtml(formattedHtml);
+    enhancement.reset();
+  };
+
+  const handleReject = () => {
+    enhancement.reset();
+  };
+
+  const handleEdit = () => {
+    console.log("Manual edit triggered.");
+  };
+
   return (
     <FluentProvider theme={theme}>
       <div className={styles.container}>
         <h2>Customize Enhancement</h2>
-        <EnhancementForm body={body} {...enhancement} />
+        <EnhancementForm
+          body={body}
+          {...enhancement}
+          onConfirm={handleConfirm}
+          onReject={handleReject}
+          onEditManually={handleEdit}
+        />
       </div>
     </FluentProvider>
   );

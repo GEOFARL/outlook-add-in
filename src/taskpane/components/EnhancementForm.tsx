@@ -11,6 +11,7 @@ import {
 } from "@fluentui/react-components";
 import React from "react";
 import PromptInput from "./PromptInput";
+import DiffViewer from "./DiffViewer";
 
 const useStyles = makeStyles({
   section: { display: "flex", flexDirection: "column", gap: "0.5rem" },
@@ -39,7 +40,8 @@ type Props = {
   redact: boolean;
   redactionMethod: string;
   prompts: string[];
-  response: string;
+  responseHtml: string;
+  responseText: string;
   error: string | null;
   loading: boolean;
   setProofread: (val: boolean) => void;
@@ -47,6 +49,9 @@ type Props = {
   setRedactionMethod: (val: string) => void;
   addPrompt: (val: string) => void;
   handleRun: () => void;
+  onEditManually?: () => void;
+  onReject?: () => void;
+  onConfirm?: () => void;
 };
 
 export const EnhancementForm: React.FC<Props> = (props) => {
@@ -106,12 +111,31 @@ export const EnhancementForm: React.FC<Props> = (props) => {
         {props.loading ? <Spinner /> : "Run Enhancement"}
       </Button>
 
-      {props.response && (
+      {props.responseText && (
+        <DiffViewer
+          original={props.body}
+          changed={props.responseText}
+          onEdit={props.onEditManually}
+          onReject={props.onReject}
+          onConfirm={props.onConfirm}
+        />
+      )}
+
+      {props.responseHtml && (
         <div className={styles.section}>
           <span>Processed Result:</span>
-          <div className={styles.resultBox} dangerouslySetInnerHTML={{ __html: props.response }} />
+          <div
+            className={styles.resultBox}
+            dangerouslySetInnerHTML={{ __html: props.responseHtml }}
+          />
         </div>
       )}
     </>
   );
 };
+
+function stripHtmlTags(html: string): string {
+  const tmp = document.createElement("DIV");
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || "";
+}

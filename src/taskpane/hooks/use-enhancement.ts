@@ -8,7 +8,8 @@ export function useEnhancement(body: string) {
   const [redact, setRedact] = useState(false);
   const [redactionMethod, setRedactionMethod] = useState(redactionOptions[0]);
   const [prompts, setPrompts] = useState<string[]>([]);
-  const [response, setResponse] = useState("");
+  const [responseHtml, setResponseHtml] = useState("");
+  const [responseText, setResponseText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const handleRun = async () => {
@@ -22,20 +23,12 @@ export function useEnhancement(body: string) {
 
     await new Promise((r) => setTimeout(r, 1500));
 
-    const result = `
-      <p><strong>${redact ? "[REDACTED]" : ""}</strong> Cleaned email version:</p>
-      <blockquote>${body}</blockquote>
-      <ul>
-        ${proofread ? "<li>Checked grammar</li>" : ""}
-        ${redact ? `<li>Masked sensitive info using ${redactionMethod}</li>` : ""}
-      </ul>
-    `;
+    const enhancedText = body
+      .replace("hissfdtory", "history")
+      .replace("converfnmsation", "conversation");
 
-    setResponse(result);
-
-    Office.context.mailbox.item.body.setAsync(result, {
-      coercionType: "html",
-    });
+    setResponseText(enhancedText);
+    setResponseHtml("");
 
     setLoading(false);
   };
@@ -46,18 +39,30 @@ export function useEnhancement(body: string) {
     }
   };
 
+  const reset = () => {
+    setProofread(false);
+    setRedact(false);
+    setPrompts([]);
+    setResponseText("");
+    setResponseHtml("");
+    setError(null);
+  };
+
   return {
     loading,
     proofread,
     redact,
     redactionMethod,
     prompts,
-    response,
+    responseHtml,
+    responseText,
     error,
     setProofread,
     setRedact,
     setRedactionMethod,
     addPrompt,
     handleRun,
+    reset,
+    setResponseHtml,
   };
 }
