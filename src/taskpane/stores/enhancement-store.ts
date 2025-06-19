@@ -11,9 +11,12 @@ type EnhancementStore = {
   prompts: string[];
   responseHtml: string;
   responseText: string;
-  error: string | null;
+  validationError: string | null;
+  responseError: string | null;
   loading: boolean;
+  progress: number;
 
+  setProgress: (val: number) => void;
   setBody: (val: string) => void;
   setProofread: (val: boolean) => void;
   setRedact: (val: boolean) => void;
@@ -22,6 +25,7 @@ type EnhancementStore = {
   handleRun: () => Promise<void>;
   reset: () => void;
   setResponseHtml: (html: string) => void;
+  removePrompt: (index: number) => void;
 };
 
 export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
@@ -32,9 +36,12 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
   prompts: [],
   responseHtml: "",
   responseText: "",
-  error: null,
+  validationError: null,
+  responseError: null,
   loading: false,
+  progress: 0,
 
+  setProgress: (val) => set({ progress: val }),
   setBody: (body) => set({ body }),
 
   setProofread: (val) => set({ proofread: val }),
@@ -48,24 +55,42 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
     }
   },
 
+  removePrompt: (index) => {
+    const prompts = get().prompts;
+    set({ prompts: prompts.filter((_, i) => i !== index) });
+  },
+
   handleRun: async () => {
+    set({ responseError: null, responseText: "", responseHtml: "" });
     const { proofread, redact, body } = get();
 
     if (!proofread && !redact) {
-      set({ error: "You need to choose at least one option." });
+      set({ validationError: "You need to choose at least one option." });
       return;
     }
 
-    set({ loading: true, error: null });
+    set({ loading: true, validationError: null });
 
-    await new Promise((r) => setTimeout(r, 1500));
+    for (let i = 1; i <= 100; i += 5) {
+      await new Promise((r) => setTimeout(r, 100));
+      set({ progress: i });
+    }
+    await new Promise((r) => setTimeout(r, 500));
+    const isError = Math.random() < 0.5;
+
+    if (isError) {
+      set({
+        responseError: "AI failed to process this request.",
+        loading: false,
+      });
+      return;
+    }
 
     const enhancedText = body
       .replace("hissfdtory", "history")
       .replace("converfnmsation", "conversation");
 
-    set({
-      responseText: enhancedText,
+    set({      responseText: enhancedText,
       responseHtml: "",
       loading: false,
     });
@@ -78,7 +103,8 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
       prompts: [],
       responseHtml: "",
       responseText: "",
-      error: null,
+      responseError: null,
+      validationError: null,
     }),
 
   setResponseHtml: (html) => set({ responseHtml: html }),

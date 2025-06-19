@@ -7,14 +7,19 @@ import { useEmailBody } from "../hooks/use-email-body";
 import { useEnhancementStore } from "../stores/enhancement-store";
 import { EnhancementForm } from "./EnhancementForm";
 import DiffViewer from "./DiffViewer";
+import { EnhancementProgressScreen } from "./EnhancementProgressScreen";
 
 const useStyles = makeStyles({
   container: {
-    padding: "1rem",
+    padding: "6px",
     display: "flex",
     flexDirection: "column",
     gap: "1.5rem",
     maxWidth: "800px",
+    minHeight: "550px",
+  },
+  title: {
+    margin: "10px 0 0 0",
   },
 });
 
@@ -23,7 +28,16 @@ const App = () => {
   const styles = useStyles();
   const emailBody = useEmailBody();
 
-  const { setBody, responseText, setResponseHtml, reset } = useEnhancementStore();
+  const {
+    setBody,
+    setResponseHtml,
+    responseText,
+    loading,
+    responseError: error,
+    reset,
+    handleRun,
+  } = useEnhancementStore();
+  const showLoadingScreen = loading || error;
 
   useEffect(() => {
     setBody(emailBody);
@@ -41,11 +55,13 @@ const App = () => {
   return (
     <FluentProvider theme={theme}>
       <div className={styles.container}>
-        {responseText ? (
+        {showLoadingScreen ? (
+          <EnhancementProgressScreen isError={!!error} onRetry={() => handleRun()} />
+        ) : responseText ? (
           <DiffViewer onReject={handleReject} onConfirm={handleConfirm} />
         ) : (
           <>
-            <h2>Customize Enhancement</h2>
+            <h2 className={styles.title}>Customize Enhancement</h2>
             <EnhancementForm />
           </>
         )}

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { diffWords } from "diff";
-import { makeStyles } from "@fluentui/react-components";
+import { Button, makeStyles, tokens } from "@fluentui/react-components";
 import { useEnhancementStore } from "../stores/enhancement-store";
 
 type Props = {
@@ -37,23 +37,7 @@ const useStyles = makeStyles({
     justifyContent: "flex-end",
     gap: "0.75rem",
     marginTop: "1.5rem",
-  },
-  button: {
-    padding: "0.5rem 1rem",
-    borderRadius: "6px",
-    background: "#fff",
-    border: "1px solid #d1d5db",
-    cursor: "pointer",
-  },
-  reject: {
-    border: "1px solid #ef4444",
-    backgroundColor: "#fff1f2",
-    color: "#b91c1c",
-  },
-  confirm: {
-    border: "1px solid #10b981",
-    backgroundColor: "#ecfdf5",
-    color: "#047857",
+    fontWeight: "500 !important",
   },
   removedText: {
     backgroundColor: "#fdecea",
@@ -103,12 +87,30 @@ const DiffViewer: React.FC<Props> = ({ onReject, onConfirm }) => {
         </div>
       </div>
       <div className={styles.actions}>
-        <button className={`${styles.button} ${styles.reject}`} onClick={onReject}>
+        <Button
+          appearance="secondary"
+          onClick={onReject}
+          shape="rounded"
+          style={{
+            backgroundColor: "#fff1f2",
+            borderColor: "#ef4444",
+            color: "#b91c1c",
+          }}
+        >
           Reject
-        </button>
-        <button className={`${styles.button} ${styles.confirm}`} onClick={onConfirm}>
+        </Button>
+        <Button
+          appearance="primary"
+          onClick={onConfirm}
+          shape="rounded"
+          style={{
+            backgroundColor: "#ecfdf5",
+            borderColor: "#10b981",
+            color: "#047857",
+          }}
+        >
           Confirm
-        </button>
+        </Button>
       </div>
     </div>
   );
