@@ -1,11 +1,12 @@
 "use client";
 
 import { FluentProvider, makeStyles } from "@fluentui/react-components";
-import React from "react";
-import { useEmailBody } from "../hooks/use-email-body";
+import React, { useEffect } from "react";
 import { useOfficeTheme } from "../hooks/use-office-theme";
-import { useEnhancement } from "../hooks/use-enhancement";
+import { useEmailBody } from "../hooks/use-email-body";
+import { useEnhancementStore } from "../stores/enhancement-store";
 import { EnhancementForm } from "./EnhancementForm";
+import DiffViewer from "./DiffViewer";
 
 const useStyles = makeStyles({
   container: {
@@ -13,45 +14,41 @@ const useStyles = makeStyles({
     display: "flex",
     flexDirection: "column",
     gap: "1.5rem",
-    maxWidth: "600px",
+    maxWidth: "800px",
   },
 });
 
 const App = () => {
   const theme = useOfficeTheme();
   const styles = useStyles();
-  const body = useEmailBody();
-  const enhancement = useEnhancement(body);
+  const emailBody = useEmailBody();
+
+  const { setBody, responseText, setResponseHtml, reset } = useEnhancementStore();
+
+  useEffect(() => {
+    setBody(emailBody);
+  }, [emailBody, setBody]);
 
   const handleConfirm = () => {
-    const formattedHtml = `
-      <p>${enhancement.responseText.replace(/\n/g, "<br>")}</p>
-    `;
-
+    const formattedHtml = `<p>${responseText.replace(/\n/g, "<br>")}</p>`;
     Office.context.mailbox.item.body.setAsync(formattedHtml, { coercionType: "html" });
-    enhancement.setResponseHtml(formattedHtml);
-    enhancement.reset();
+    setResponseHtml(formattedHtml);
+    reset();
   };
 
-  const handleReject = () => {
-    enhancement.reset();
-  };
-
-  const handleEdit = () => {
-    console.log("Manual edit triggered.");
-  };
+  const handleReject = () => reset();
 
   return (
     <FluentProvider theme={theme}>
       <div className={styles.container}>
-        <h2>Customize Enhancement</h2>
-        <EnhancementForm
-          body={body}
-          {...enhancement}
-          onConfirm={handleConfirm}
-          onReject={handleReject}
-          onEditManually={handleEdit}
-        />
+        {responseText ? (
+          <DiffViewer onReject={handleReject} onConfirm={handleConfirm} />
+        ) : (
+          <>
+            <h2>Customize Enhancement</h2>
+            <EnhancementForm />
+          </>
+        )}
       </div>
     </FluentProvider>
   );
