@@ -4,6 +4,10 @@ const devCerts = require("office-addin-dev-certs");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
+const dotenv = require("dotenv");
+
+// Load .env file variables
+dotenv.config();
 
 const urlDev = "https://localhost:3000/";
 const urlProd = "https://www.contoso.com/"; // CHANGE THIS TO YOUR PRODUCTION DEPLOYMENT LOCATION
@@ -93,6 +97,14 @@ module.exports = async (env, options) => {
       new webpack.ProvidePlugin({
         Promise: ["es6-promise", "Promise"],
       }),
+      new webpack.DefinePlugin({
+        "process.env.ML_REDACT_SUBSCRIPTION_KEY": JSON.stringify(
+          process.env.ML_REDACT_SUBSCRIPTION_KEY || ""
+        ),
+        "process.env.ML_REDACT_BEARER_TOKEN": JSON.stringify(
+          process.env.ML_REDACT_BEARER_TOKEN || ""
+        ),
+      }),
     ],
     devServer: {
       hot: true,
@@ -101,7 +113,10 @@ module.exports = async (env, options) => {
       },
       server: {
         type: "https",
-        options: env.WEBPACK_BUILD || options.https !== undefined ? options.https : await getHttpsOptions(),
+        options:
+          env.WEBPACK_BUILD || options.https !== undefined
+            ? options.https
+            : await getHttpsOptions(),
       },
       port: process.env.npm_package_config_dev_server_port || 3000,
     },

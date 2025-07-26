@@ -7,7 +7,6 @@ import {
   Option,
   Spinner,
   Switch,
-  Textarea,
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
@@ -34,34 +33,24 @@ const useStyles = makeStyles({
   runBtn: {
     backgroundColor: "#0F6CBD",
     fontWeight: 500,
-    "&:hover": {
-      backgroundColor: "#0C5BA9",
-    },
-    "&:active": {
-      backgroundColor: "#094B8A !important",
-    },
-    "&:focus": {
-      backgroundColor: "#094B8A !important",
-    },
+    "&:hover": { backgroundColor: "#0C5BA9" },
+    "&:active": { backgroundColor: "#094B8A !important" },
+    "&:focus": { backgroundColor: "#094B8A !important" },
   },
   runBtnContent: {
     display: "flex",
     alignItems: "center",
     gap: "6px",
   },
-
   dropdown: {
     backgroundColor: "#FAFCFF",
     border: `1px solid ${tokens.colorBrandStroke1}`,
-    "&:hover": {
-      border: "1px solid #0F6CBD",
-    },
+    "&:hover": { border: "1px solid #0F6CBD" },
     "&:focus-within": {
       border: "1px solid #0F6CBD",
       boxShadow: `0 0 0 2px ${tokens.colorBrandBackground2}`,
     },
   },
-
   switch: {
     "--colorCompoundBrandBackground": "#0F6CBD",
     "--colorCompoundBrandBackgroundPressed": "#0F6CBD",
@@ -77,14 +66,15 @@ export const EnhancementForm: React.FC = () => {
     redact,
     redactionMethod,
     prompts,
-    validationError: error,
+    validationError,
+    responseError,
     loading,
     setProofread,
     setRedact,
     setRedactionMethod,
     addPrompt,
-    handleRun,
     removePrompt,
+    handleRun,
   } = useEnhancementStore();
 
   return (
@@ -140,11 +130,12 @@ export const EnhancementForm: React.FC = () => {
             </div>
           ))}
         </div>
-
         <PromptInput onAdd={addPrompt} disabled={prompts.length >= 5} />
       </Field>
 
-      {error && <div style={{ color: "red" }}>{error}</div>}
+      {(validationError || responseError) && (
+        <div style={{ color: "red" }}>{validationError || responseError}</div>
+      )}
 
       <Button className={styles.runBtn} appearance="primary" onClick={handleRun} disabled={loading}>
         {loading ? (

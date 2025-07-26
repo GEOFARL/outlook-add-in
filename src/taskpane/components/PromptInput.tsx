@@ -19,7 +19,7 @@ const useStyles = makeStyles({
     flex: 1,
   },
   addButton: {
-    height: "32px", // match input height
+    height: "32px",
     minWidth: "32px",
     padding: "0 8px",
   },

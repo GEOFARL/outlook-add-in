@@ -5,3 +5,5 @@ test/testBuild
 # Node modules folder
 node_modules/
 .vscode
+
+.env

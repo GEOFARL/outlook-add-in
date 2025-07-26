@@ -2,7 +2,7 @@
 
 import React from "react";
 import { diffWords } from "diff";
-import { Button, makeStyles, tokens } from "@fluentui/react-components";
+import { Button, makeStyles } from "@fluentui/react-components";
 import { useEnhancementStore } from "../stores/enhancement-store";
 
 type Props = {
@@ -11,19 +11,24 @@ type Props = {
 };
 
 const useStyles = makeStyles({
-  row: {
+  container: {
     display: "flex",
     flexDirection: "column",
     gap: "1.5rem",
     marginTop: "1rem",
   },
-  column: { flex: 1 },
-  label: { fontWeight: 600 },
+  section: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.5rem",
+  },
+  label: {
+    fontWeight: 600,
+  },
   box: {
     backgroundColor: "#f9fafb",
     borderRadius: "4px",
     padding: "1rem",
-    minHeight: "150px",
     whiteSpace: "pre-wrap",
   },
   originalBox: {
@@ -31,13 +36,6 @@ const useStyles = makeStyles({
   },
   changedBox: {
     border: "1px solid #e5e7eb",
-  },
-  actions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "0.75rem",
-    marginTop: "1.5rem",
-    fontWeight: "500 !important",
   },
   removedText: {
     backgroundColor: "#fdecea",
@@ -47,16 +45,28 @@ const useStyles = makeStyles({
     backgroundColor: "#ecfdf3",
     color: "#027a48",
   },
+  actions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "0.75rem",
+    marginTop: "1.5rem",
+  },
 });
 
 const DiffViewer: React.FC<Props> = ({ onReject, onConfirm }) => {
   const styles = useStyles();
-  const { body: original, responseText: changed } = useEnhancementStore();
+  const {
+    body: originalBody,
+    responseText: changedBody,
+    subject,
+    updatedSubject,
+  } = useEnhancementStore();
 
-  const diff = diffWords(original, changed);
+  const subjectDiff = diffWords(subject || "", updatedSubject || "");
+  const bodyDiff = diffWords(originalBody || "", changedBody || "");
 
-  const renderOriginal = () =>
-    diff.map((part, i) =>
+  const renderOriginal = (diffArr: ReturnType<typeof diffWords>) =>
+    diffArr.map((part, i) =>
       part.added ? null : (
         <span key={i} className={part.removed ? styles.removedText : undefined}>
           {part.value}
@@ -64,8 +74,8 @@ const DiffViewer: React.FC<Props> = ({ onReject, onConfirm }) => {
       )
     );
 
-  const renderChanged = () =>
-    diff.map((part, i) =>
+  const renderChanged = (diffArr: ReturnType<typeof diffWords>) =>
+    diffArr.map((part, i) =>
       part.removed ? null : (
         <span key={i} className={part.added ? styles.addedText : undefined}>
           {part.value}
@@ -74,18 +84,23 @@ const DiffViewer: React.FC<Props> = ({ onReject, onConfirm }) => {
     );
 
   return (
-    <div>
+    <div className={styles.container}>
       <h3>Review Before Send</h3>
-      <div className={styles.row}>
-        <div className={styles.column}>
-          <h4 className={styles.label}>Original text</h4>
-          <div className={`${styles.box} ${styles.originalBox}`}>{renderOriginal()}</div>
-        </div>
-        <div className={styles.column}>
-          <h4 className={styles.label}>Changed text</h4>
-          <div className={`${styles.box} ${styles.changedBox}`}>{renderChanged()}</div>
-        </div>
+
+      {/* Subject Section */}
+      <div className={styles.section}>
+        <h4 className={styles.label}>Subject</h4>
+        <div className={`${styles.box} ${styles.originalBox}`}>{renderOriginal(subjectDiff)}</div>
+        <div className={`${styles.box} ${styles.changedBox}`}>{renderChanged(subjectDiff)}</div>
       </div>
+
+      {/* Body Section */}
+      <div className={styles.section}>
+        <h4 className={styles.label}>Body</h4>
+        <div className={`${styles.box} ${styles.originalBox}`}>{renderOriginal(bodyDiff)}</div>
+        <div className={`${styles.box} ${styles.changedBox}`}>{renderChanged(bodyDiff)}</div>
+      </div>
+
       <div className={styles.actions}>
         <Button
           appearance="secondary"

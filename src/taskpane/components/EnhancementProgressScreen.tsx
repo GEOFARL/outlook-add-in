@@ -77,35 +77,35 @@ const useStyles = makeStyles({
 });
 
 type Props = {
-  isError?: boolean;
+  error: string;
   onRetry: () => void;
 };
 
-export const EnhancementProgressScreen: React.FC<Props> = ({ isError, onRetry }) => {
+export const EnhancementProgressScreen: React.FC<Props> = ({ error, onRetry }) => {
   const styles = useStyles();
   const progress = useEnhancementStore((s) => s.progress);
 
   return (
     <div className={styles.container}>
-      <div className={styles.icon}>{isError ? "❌" : "📝"}</div>
+      <div className={styles.icon}>{error ? "❌" : "📝"}</div>
 
       <div className={styles.progressBarOuter}>
         <div
-          className={`${styles.progressBarInner} ${isError ? styles.progressBarInnerError : ""}`}
+          className={`${styles.progressBarInner} ${error ? styles.progressBarInnerError : ""}`}
           style={{ width: `${progress}%` }}
         />
       </div>
 
       <div className={styles.labelContainer}>
         <div className={styles.label}>Checking letter</div>
-        <div className={`${styles.statusText} ${isError ? styles.statusTextError : ""}`}>
-          {isError ? "Canceled" : `Uploading... ${progress}%`}
+        <div className={`${styles.statusText} ${error ? styles.statusTextError : ""}`}>
+          {error ? "Canceled" : `Uploading... ${progress}%`}
         </div>
       </div>
 
-      {isError && (
+      {error && (
         <div className={styles.errorContainer}>
-          <div className={styles.error}>AI processing could not be completed.</div>
+          <div className={styles.error}>{error}</div>
           <div className={styles.buttons}>
             <Button onClick={onRetry}>Try again</Button>
           </div>
