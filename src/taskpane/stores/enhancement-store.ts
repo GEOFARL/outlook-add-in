@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ML_REDACT_BEARER_TOKEN, ML_REDACT_SUBSCRIPTION_KEY } from "../../config";
 import { MLRedactApiClient } from "../api/mlRedactApiClient";
+import { getRecipients } from "../utils/get-recipients";
 
 const apiClient = new MLRedactApiClient(ML_REDACT_SUBSCRIPTION_KEY, ML_REDACT_BEARER_TOKEN);
 
@@ -87,7 +88,10 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
         resolve(result.status === Office.AsyncResultStatus.Succeeded ? result.value : "No Subject");
       });
     });
-    set({ subject });
+
+    const sender = Office.context.mailbox.userProfile.emailAddress ?? "unknown@example.com";
+    const recipients = await getRecipients();
+    const now = new Date().toISOString();
 
     try {
       for (let i = 10; i <= 90; i += 20) {
@@ -97,18 +101,26 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
 
       const response = await apiClient.processMessage({
         messageId: `msg-${Date.now()}`,
-        tenantId: "T1",
+        tenantId: "T2",
+        utcTimestamp: now,
+        triggerType: "onSend",
         subject,
         body,
-        actionsRequested: [...(proofread ? ["proofread"] : []), ...(redact ? ["redact"] : [])],
+        actionsRequested: [
+          ...(proofread ? (["Proofread"] as const) : []),
+          ...(redact ? (["Redact"] as const) : []),
+        ],
         redactionMethod,
         userContext: prompts.join(", "),
+        messageRecipients: recipients,
+        messageSender: sender,
       });
 
       set({
-        updatedSubject: response.updatedSubject,
-        responseText: response.updatedBody,
-        responseHtml: `<p>${response.updatedBody}</p>`,
+        subject,
+        updatedSubject: response.UpdatedSubject,
+        responseText: response.UpdatedBody,
+        responseHtml: `<p>${response.UpdatedBody.replace(/\n/g, "<br>")}</p>`,
         progress: 100,
         loading: false,
       });

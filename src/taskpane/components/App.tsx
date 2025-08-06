@@ -67,7 +67,7 @@ const App = () => {
       <div className={styles.container}>
         {showLoadingScreen ? (
           <EnhancementProgressScreen error={error} onRetry={() => handleRun()} />
-        ) : responseText ? (
+        ) : responseText?.trim() ? (
           <DiffViewer onReject={handleReject} onConfirm={handleConfirm} />
         ) : (
           <>

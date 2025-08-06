@@ -5,24 +5,32 @@ export type MLRedactRequest = {
   tenantId: string;
   subject: string;
   body: string;
-  actionsRequested: string[];
+  utcTimestamp: string;
+  triggerType: "onSend" | "manual";
+  actionsRequested: ("Proofread" | "Redact")[];
   redactionMethod: string;
   userContext?: string;
+  messageRecipients: {
+    to: string[];
+    cc: string[];
+    bcc: string[];
+  };
+  messageSender: string;
 };
 
 export type MLRedactResponse = {
-  messageId: string;
-  tenantId: string;
-  updatedSubject: string;
-  updatedBody: string;
-  reqConfirm: boolean;
+  MessageId: string;
+  TenantId: string;
+  UpdatedSubject: string;
+  UpdatedBody: string;
+  ReqConfirm: boolean;
 };
 
 function getApiBaseUrl() {
   if (process.env.NODE_ENV === "development") {
     return "https://localhost:4000/dev-api";
   }
-  return "https://mlredactapidev-aafrfrbxetdmc9f5.southafricanorth-01.azurewebsites.net";
+  return "https://mlredact-apim.azure-api.net";
 }
 
 export class MLRedactApiClient {
@@ -41,9 +49,13 @@ export class MLRedactApiClient {
 
   async processMessage(request: MLRedactRequest): Promise<MLRedactResponse> {
     const idempotencyKey = `${request.messageId}-${Date.now()}`;
-    const response = await this.axios.post<MLRedactResponse>(`/v1/messages`, request, {
-      headers: { "Idempotency-Key": idempotencyKey },
-    });
+    const response = await this.axios.post<MLRedactResponse>(
+      `function-mlredact/ProcessEmail`,
+      request,
+      {
+        headers: { "Idempotency-Key": idempotencyKey },
+      }
+    );
     return response.data;
   }
 }

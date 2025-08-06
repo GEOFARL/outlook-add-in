@@ -18,7 +18,7 @@ app.use((req, res, next) => {
 app.use(
   "/dev-api",
   createProxyMiddleware({
-    target: "https://mlredactapidev-aafrfrbxetdmc9f5.southafricanorth-01.azurewebsites.net",
+    target: "https://mlredact-apim.azure-api.net",
     changeOrigin: true,
     secure: false,
     pathRewrite: { "^/dev-api": "" },
