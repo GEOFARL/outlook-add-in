@@ -25,8 +25,8 @@ git --version
 ### 1. Clone the repository
 
 ```bash
-git clone git@github.com:heaven-soft/machine-learning-solutions.git
-cd machine-learning-solutions
+git clone git@github.com:ml-solutions-pty-ltd/ml-redact-outlook-plugin.git
+cd ml-redact-outlook-plugin
 ```
 
 ### 2. Install dependencies
@@ -52,7 +52,6 @@ node proxy-server.js
 ```
 
 This allows Outlook to communicate securely with the backend.
-
 
 ## 📨 Load the Plugin in Outlook
 
