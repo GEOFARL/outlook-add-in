@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Auth</title>
+  </head>
+  <body>
+    <script type="module">
+      import { msalInstance } from "../auth/msal.js";
+      msalInstance.handleRedirectPromise().then(() => {
+        window.location.replace("/taskpane.html");
+      });
+    </script>
+  </body>
+</html>

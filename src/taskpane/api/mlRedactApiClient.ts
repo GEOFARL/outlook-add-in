@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosHeaders, AxiosInstance } from "axios";
 
 export type MLRedactRequest = {
   messageId: string;
@@ -10,11 +10,7 @@ export type MLRedactRequest = {
   actionsRequested: ("Proofread" | "Redact")[];
   redactionMethod: string;
   userContext?: string;
-  messageRecipients: {
-    to: string[];
-    cc: string[];
-    bcc: string[];
-  };
+  messageRecipients: { to: string[]; cc: string[]; bcc: string[] };
   messageSender: string;
 };
 
@@ -36,26 +32,35 @@ function getApiBaseUrl() {
 export class MLRedactApiClient {
   private axios: AxiosInstance;
 
-  constructor(subscriptionKey: string, bearerToken: string) {
+  constructor(
+    subscriptionKey: string,
+    private tokenProvider: () => Promise<string>
+  ) {
     this.axios = axios.create({
       baseURL: getApiBaseUrl(),
       headers: {
         "Content-Type": "application/json",
         "Ocp-Apim-Subscription-Key": subscriptionKey,
-        Authorization: `Bearer ${bearerToken}`,
       },
+    });
+
+    this.axios.interceptors.request.use(async (config) => {
+      const token = await this.tokenProvider();
+      if (token) {
+        if (!config.headers) {
+          config.headers = new AxiosHeaders();
+        }
+        (config.headers as AxiosHeaders).set("Authorization", `Bearer ${token}`);
+      }
+      return config;
     });
   }
 
   async processMessage(request: MLRedactRequest): Promise<MLRedactResponse> {
     const idempotencyKey = `${request.messageId}-${Date.now()}`;
-    const response = await this.axios.post<MLRedactResponse>(
-      `function-mlredact/ProcessEmail`,
-      request,
-      {
-        headers: { "Idempotency-Key": idempotencyKey },
-      }
-    );
-    return response.data;
+    const res = await this.axios.post<MLRedactResponse>("function-mlredact/ProcessEmail", request, {
+      headers: { "Idempotency-Key": idempotencyKey },
+    });
+    return res.data;
   }
 }

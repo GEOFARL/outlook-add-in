@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import { ML_REDACT_BEARER_TOKEN, ML_REDACT_SUBSCRIPTION_KEY } from "../../config";
+import { getApiAccessToken } from "../../auth/msal";
 import { MLRedactApiClient } from "../api/mlRedactApiClient";
 import { getRecipients } from "../utils/get-recipients";
 
-const apiClient = new MLRedactApiClient(ML_REDACT_SUBSCRIPTION_KEY, ML_REDACT_BEARER_TOKEN);
+const apiClient = new MLRedactApiClient("25f4389cf52441e0b16c6adc466c0c5b", getApiAccessToken);
 
 const redactionOptions = ["Blackout", "<REDACTED>", "Partial mask"] as const;
 type RedactionOption = (typeof redactionOptions)[number];
