@@ -9,35 +9,34 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="ML-Redact Email Assistant"/>
   <Description DefaultValue="Redact or proofread emails before sending."/>
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-128.png"/>
+  <IconUrl DefaultValue="https://remarkable-frangipane-cca096.netlify.app/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://remarkable-frangipane-cca096.netlify.app/assets/icon-128.png"/>
   <SupportUrl DefaultValue="https://www.contoso.com/help"/>
   <AppDomains>
-    <AppDomain>https://www.contoso.com</AppDomain>
+    <AppDomain>https://remarkable-frangipane-cca096.netlify.app</AppDomain>
+    <AppDomain>https://mlredact-apim.azure-api.net</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Mailbox" />
   </Hosts>
-  <!-- The <Requirements> element overridden by any <Requirements> element inside a <VersionOverrides> element. -->
   <Requirements>
     <Sets>
       <Set Name="Mailbox" MinVersion="1.1" />
     </Sets>
   </Requirements>
-  <!-- The <FormSettins> element is required for validation, but is ignored when there is a <VersionOverrides> element. -->
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
+        <SourceLocation DefaultValue="https://remarkable-frangipane-cca096.netlify.app/taskpane.html"/>
         <RequestedHeight>250</RequestedHeight>
       </DesktopSettings>
     </Form>
   </FormSettings>
   <Permissions>ReadWriteItem</Permissions>
-  <!-- The <Rule> element is required for validation, but is ignored when there is a <VersionOverrides> element. -->
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
   </Rule>
+
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
       <Requirements>
@@ -76,13 +75,13 @@
       </Hosts>
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-          <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-          <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+          <bt:Image id="Icon.16x16" DefaultValue="https://remarkable-frangipane-cca096.netlify.app/assets/icon-16.png"/>
+          <bt:Image id="Icon.32x32" DefaultValue="https://remarkable-frangipane-cca096.netlify.app/assets/icon-32.png"/>
+          <bt:Image id="Icon.80x80" DefaultValue="https://remarkable-frangipane-cca096.netlify.app/assets/icon-80.png"/>
         </bt:Images>
         <bt:Urls>
-          <bt:Url id="Commands.Url" DefaultValue="https://localhost:3000/commands.html" />
-          <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html" />
+          <bt:Url id="Commands.Url" DefaultValue="https://remarkable-frangipane-cca096.netlify.app/commands.html" />
+          <bt:Url id="Taskpane.Url" DefaultValue="https://remarkable-frangipane-cca096.netlify.app/taskpane.html" />
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="ML-Redact"/>

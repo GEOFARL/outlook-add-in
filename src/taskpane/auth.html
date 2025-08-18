@@ -6,10 +6,18 @@
   </head>
   <body>
     <script type="module">
-      import { msalInstance } from "../auth/msal.js";
-      msalInstance.handleRedirectPromise().then(() => {
+      import { msalInstance, msalReady } from "../auth/msal.js";
+
+      (async () => {
+        await msalReady;
+
+        const result = await msalInstance.handleRedirectPromise();
+        if (result?.account) {
+          msalInstance.setActiveAccount(result.account);
+        }
+
         window.location.replace("/taskpane.html");
-      });
+      })();
     </script>
   </body>
 </html>
