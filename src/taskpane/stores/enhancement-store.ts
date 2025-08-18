@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import { getApiAccessToken } from "../../auth/msal";
 import { MLRedactApiClient } from "../api/mlRedactApiClient";
 import { getRecipients } from "../utils/get-recipients";
+import { getApiAccessToken } from "../../auth/getToken";
+import { classifyAxiosError, decodeJwtPayload, quickCorsProbe } from "../utils/net-diagnostics";
 
 const apiClient = new MLRedactApiClient("25f4389cf52441e0b16c6adc466c0c5b", getApiAccessToken);
 
@@ -126,38 +127,69 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
       });
     } catch (err: any) {
       console.error("Error processing message:", err);
-      let errorDetails = "Failed to process message.";
+
+      // ✅ classify the error
+      const classification = classifyAxiosError(err);
+
+      // ✅ grab token + decode for helpful hints
+      const authHeader: string | undefined =
+        err?.config?.headers?.Authorization || err?.config?.headers?.authorization;
+      const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+      const jwt = decodeJwtPayload(token);
+      const aud = jwt?.aud;
+      const tid = jwt?.tid;
+      const sub = jwt?.sub;
+
+      // ✅ run a quick probe so you can SEE something even in desktop Outlook
+      let probeText = "";
+      try {
+        const endpoint = new URL(err?.config?.url ?? "", err?.config?.baseURL ?? "").href;
+        const probe = await quickCorsProbe(endpoint);
+        probeText = `Probe from origin ${probe.origin}:\n- ${probe.notes.join("\n- ")}`;
+      } catch {
+        /* ignore */
+      }
+
+      let errorDetails = "";
 
       if (err.response) {
         errorDetails = `
-          Response Error:
-          Status: ${err.response.status} ${err.response.statusText}
-          URL: ${err.config?.url || "N/A"}
-          Method: ${err.config?.method || "N/A"}
-          Headers: ${JSON.stringify(err.config?.headers || {}, null, 2)}
-          Response Data: ${JSON.stringify(err.response.data, null, 2)}
-        `;
+    Response Error
+    Status: ${err.response.status} ${err.response.statusText}
+    URL: ${err.config?.url || "N/A"}
+    Method: ${err.config?.method || "N/A"}
+    Request Headers: ${JSON.stringify(err.config?.headers || {}, null, 2)}
+    Response Data: ${JSON.stringify(err.response.data, null, 2)}
+    Classification: ${classification.kind} — ${classification.hint}
+    JWT (aud): ${aud || "N/A"}
+    JWT (tid): ${tid || "N/A"}
+    JWT (sub): ${sub || "N/A"}
+    ${probeText}
+    `.trim();
       } else if (err.request) {
         errorDetails = `
-          No Response Received:
-          URL: ${err.config?.url || "N/A"}
-          Method: ${err.config?.method || "N/A"}
-          Headers: ${JSON.stringify(err.config?.headers || {}, null, 2)}
-          Message: ${err.message}
-        `;
+    No Response Received
+    URL: ${err.config?.url || "N/A"}
+    Method: ${err.config?.method || "N/A"}
+    Request Headers: ${JSON.stringify(err.config?.headers || {}, null, 2)}
+    Message: ${err.message}
+    Classification: ${classification.kind} — ${classification.hint}
+    JWT (aud): ${aud || "N/A"}
+    JWT (tid): ${tid || "N/A"}
+    JWT (sub): ${sub || "N/A"}
+    ${probeText}
+    `.trim();
       } else {
         errorDetails = `
-          Request Setup Error:
-          Message: ${err.message}
-          Stack: ${err.stack || "N/A"}
-        `;
+    Request Setup Error
+    Message: ${err.message}
+    Stack: ${err.stack || "N/A"}
+    Classification: ${classification.kind} — ${classification.hint}
+    ${probeText}
+    `.trim();
       }
 
-      set({
-        responseError: errorDetails.trim(),
-        loading: false,
-        progress: 0,
-      });
+      set({ responseError: errorDetails, loading: false, progress: 0 });
     }
   },
 
