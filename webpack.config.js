@@ -28,6 +28,7 @@ module.exports = async (env, options) => {
         import: ["./src/taskpane/index.tsx", "./src/taskpane/taskpane.html"],
         dependOn: "react",
       },
+      auth: "./src/taskpane/auth.ts",
       commands: "./src/commands/commands.ts",
     },
     output: {
@@ -69,6 +70,12 @@ module.exports = async (env, options) => {
         filename: "taskpane.html",
         template: "./src/taskpane/taskpane.html",
         chunks: ["polyfill", "taskpane", "react"],
+      }),
+      new HtmlWebpackPlugin({
+        filename: "auth.html",
+        template: "./src/taskpane/auth.html",
+        chunks: ["polyfill", "auth"],
+        inject: "body",
       }),
       new CopyWebpackPlugin({
         patterns: [
