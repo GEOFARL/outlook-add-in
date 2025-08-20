@@ -1,49 +1,76 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Auth</title>
-    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  </head>
-  <body>
-    <script type="module">
-      import { msalInstance, msalReady, API_SCOPE } from "../auth/msal.js";
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script type="module">
+  import { msalInstance, msalReady, API_SCOPE } from "/_assets/msal.js";
+  import { DBG } from "/_assets/debug.js"; // ensure path exists
 
-      const isDialog = () =>
-        window.location.search.includes("dialog=1") &&
-        !!(window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent);
+  const inDialog = () =>
+    window.location.search.includes("dialog=1") &&
+    !!(window.Office && Office.context?.ui?.messageParent);
 
-      async function run() {
-        await msalReady;
-
-        const result = await msalInstance.handleRedirectPromise();
-        if (result?.account) msalInstance.setActiveAccount(result.account);
-
-        const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
-        if (!account) {
-          await msalInstance.loginRedirect({ scopes: [API_SCOPE] });
-          return; // resumes here after redirect
+  function installAckHandler() {
+    if (!inDialog()) return;
+    Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, (evt) => {
+      DBG.log("ParentMessageReceived:", evt?.message);
+      try {
+        const msg = JSON.parse(evt.message || "{}");
+        if (msg?.type === "ack-close") {
+          DBG.log("ACK received, closing self");
+          if (Office.context.ui.closeContainer) Office.context.ui.closeContainer();
+          else window.close();
         }
-
-        const tokenResult = await msalInstance.acquireTokenSilent({ scopes: [API_SCOPE], account });
-        const token = tokenResult.accessToken;
-
-        if (isDialog()) {
-          // ✅ Send token back to taskpane and STOP
-          Office.context.ui.messageParent(JSON.stringify({ type: "aad-token", token }));
-          return; // <-- IMPORTANT: do NOT navigate to taskpane inside the dialog
-        }
-
-        // Fallback for direct browser hits (not dialog)
-        window.location.replace("/taskpane.html");
+      } catch (e) {
+        DBG.err("ACK parse error:", e);
       }
+    });
+  }
 
-      // Wait for Office to be ready in case we're inside a dialog
-      if (window.Office && Office.onReady) {
-        Office.onReady().then(run);
-      } else {
-        run();
+  async function sendTokenToParent(token) {
+    if (inDialog()) {
+      DBG.log("Sending token to parent (len):", token.length);
+      try {
+        Office.context.ui.messageParent(JSON.stringify({ type: "aad-token", token }));
+      } catch (e) {
+        DBG.err("messageParent error:", e);
       }
-    </script>
-  </body>
-</html>
+      return;
+    }
+    DBG.log("Not in dialog; redirecting to taskpane");
+    window.location.replace("/taskpane.html");
+  }
+
+  async function run() {
+    DBG.log("Auth page boot; Office?", !!window.Office);
+    await msalReady;
+    DBG.log("MSAL ready");
+
+    const res = await msalInstance.handleRedirectPromise();
+    DBG.log("handleRedirectPromise result account?", !!res?.account);
+    if (res?.account) msalInstance.setActiveAccount(res.account);
+
+    const accounts = msalInstance.getAllAccounts();
+    DBG.log("accounts.length:", accounts.length);
+
+    let account = msalInstance.getActiveAccount() || accounts[0];
+    if (!account) {
+      DBG.log("No account; doing loginRedirect");
+      await msalInstance.loginRedirect({ scopes: [API_SCOPE], prompt: "select_account" });
+      return;
+    }
+
+    installAckHandler();
+
+    DBG.log("Calling acquireTokenSilent for", account.username);
+    const tokenRes = await msalInstance.acquireTokenSilent({ scopes: [API_SCOPE], account });
+    DBG.log("Got token; sending to parent");
+    await sendTokenToParent(tokenRes.accessToken);
+  }
+
+  if (window.Office && Office.onReady) {
+    Office.onReady().then(() => {
+      DBG.log("Office.onReady");
+      run();
+    });
+  } else {
+    run();
+  }
+</script>

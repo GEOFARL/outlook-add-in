@@ -1,37 +1,63 @@
 import { msalInstance, msalReady, API_SCOPE } from "../auth/msal";
 
-const isDialog = () =>
+const inDialog = () =>
   window.location.search.includes("dialog=1") &&
-  !!(window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent);
+  !!(window.Office && Office.context?.ui?.messageParent);
+
+function installAckHandler() {
+  if (!inDialog()) return;
+  Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, (evt) => {
+    try {
+      const msg = JSON.parse(evt.message || "{}");
+      if (msg?.type === "ack-close") {
+        if (Office.context.ui.closeContainer) Office.context.ui.closeContainer();
+        else window.close();
+      }
+    } catch {}
+  });
+}
+
+function sendOnAllChannels(token) {
+  try {
+    Office.context.ui.messageParent(JSON.stringify({ type: "aad-token", token }));
+  } catch {}
+
+  try {
+    const bc = new BroadcastChannel("aad-auth");
+    bc.postMessage({ type: "aad-token", token });
+    setTimeout(() => bc.close(), 200);
+  } catch {}
+
+  try {
+    localStorage.setItem("aad_token_drop", JSON.stringify({ token, ts: Date.now() }));
+  } catch {}
+}
+
+async function sendTokenAndExit(token) {
+  if (inDialog()) {
+    sendOnAllChannels(token);
+    return;
+  }
+  window.location.replace("/taskpane.html");
+}
 
 async function run() {
   await msalReady;
 
-  const result = await msalInstance.handleRedirectPromise();
-  if (result?.account) msalInstance.setActiveAccount(result.account);
+  const res = await msalInstance.handleRedirectPromise();
+  if (res?.account) msalInstance.setActiveAccount(res.account);
 
-  const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+  let account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
   if (!account) {
-    await msalInstance.loginRedirect({ scopes: [API_SCOPE] });
-    return; // resumes here after redirect
+    await msalInstance.loginRedirect({ scopes: [API_SCOPE], prompt: "select_account" });
+    return;
   }
 
-  const tokenResult = await msalInstance.acquireTokenSilent({ scopes: [API_SCOPE], account });
-  const token = tokenResult.accessToken;
+  installAckHandler();
 
-  if (isDialog()) {
-    // ✅ Send token back to taskpane and STOP
-    Office.context.ui.messageParent(JSON.stringify({ type: "aad-token", token }));
-    return; // <-- IMPORTANT: do NOT navigate to taskpane inside the dialog
-  }
-
-  // Fallback for direct browser hits (not dialog)
-  window.location.replace("/taskpane.html");
+  const tokenRes = await msalInstance.acquireTokenSilent({ scopes: [API_SCOPE], account });
+  await sendTokenAndExit(tokenRes.accessToken);
 }
 
-// Wait for Office to be ready in case we're inside a dialog
-if (window.Office && Office.onReady) {
-  Office.onReady().then(run);
-} else {
-  run();
-}
+if (window.Office && Office.onReady) Office.onReady().then(run);
+else run();
