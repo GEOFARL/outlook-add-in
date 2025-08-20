@@ -1,4 +1,5 @@
 import axios, { AxiosHeaders, AxiosInstance } from "axios";
+import { API_SCOPE } from "../../auth/msal";
 
 export type MLRedactRequest = {
   messageId: string;
@@ -37,38 +38,47 @@ export class MLRedactApiClient {
     subscriptionKey: string,
     private tokenProvider: () => Promise<string>
   ) {
+    // features/api/mlRedactApiClient.ts (constructor)
     this.axios = axios.create({
       baseURL: getApiBaseUrl(),
+      timeout: 2500,
       headers: {
         "Content-Type": "application/json",
         "Ocp-Apim-Subscription-Key": subscriptionKey,
       },
     });
-    // this.axios = axios.create({
-    //   baseURL: getApiBaseUrl(),
-    //   headers: { "Content-Type": "application/json" },
-    // });
 
+    // attach bearer from provider
     this.axios.interceptors.request.use(async (config) => {
       const token = await this.tokenProvider();
-      if (token) {
-        if (!config.headers) {
-          config.headers = new AxiosHeaders();
-        }
-        (config.headers as AxiosHeaders).set("Authorization", `Bearer ${token}`);
-      }
+      config.headers = config.headers || new AxiosHeaders();
+      (config.headers as AxiosHeaders).set("Authorization", `Bearer ${token}`);
       return config;
     });
-    // this.axios.interceptors.request.use(async (config) => {
-    //   // make url absolute for better error text
-    //   if (config.baseURL && config.url && !/^https?:\/\//i.test(config.url)) {
-    //     config.url = new URL(config.url, config.baseURL).href;
-    //   }
-    //   const token = await this.tokenProvider();
-    //   if (!config.headers) config.headers = new AxiosHeaders();
-    //   if (token) (config.headers as AxiosHeaders).set("Authorization", `Bearer ${token}`);
-    //   return config;
-    // });
+
+    // retry once on 401 with **silent** refresh only
+    this.axios.interceptors.response.use(undefined, async (error) => {
+      if (error?.response?.status === 401 && !error.config.__retried401) {
+        error.config.__retried401 = true;
+        try {
+          const { msalInstance } = await import("../../auth/msal");
+          const { setCachedToken } = await import("../../auth/dialogAuth");
+          const acc = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+          if (!acc) throw new Error("No account for silent refresh");
+          const res = await msalInstance.acquireTokenSilent({
+            scopes: [API_SCOPE],
+            account: acc,
+            forceRefresh: true,
+          });
+          setCachedToken(res.accessToken); // keep memory cache hot
+          error.config.headers = error.config.headers || new AxiosHeaders();
+          (error.config.headers as AxiosHeaders).set("Authorization", `Bearer ${res.accessToken}`);
+          return this.axios.request(error.config);
+        } catch (e) {
+        }
+      }
+      throw error;
+    });
   }
 
   async processMessage(request: MLRedactRequest): Promise<MLRedactResponse> {

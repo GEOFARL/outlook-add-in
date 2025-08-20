@@ -1,23 +1,32 @@
 import { msalInstance, msalReady, API_SCOPE } from "../auth/msal";
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
 const inDialog = () =>
   window.location.search.includes("dialog=1") &&
   !!(window.Office && Office.context?.ui?.messageParent);
 
+let ackedByParent = false;
+
 function installAckHandler() {
   if (!inDialog()) return;
-  Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, (evt) => {
-    try {
-      const msg = JSON.parse(evt.message || "{}");
-      if (msg?.type === "ack-close") {
-        if (Office.context.ui.closeContainer) Office.context.ui.closeContainer();
-        else window.close();
-      }
-    } catch {}
-  });
+  try {
+    Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, (evt) => {
+      try {
+        const msg = JSON.parse(evt?.message || "{}");
+        if (msg?.type === "ack-close") {
+          ackedByParent = true;
+          if (Office.context.ui.closeContainer) {
+            Office.context.ui.closeContainer();
+          } else {
+            window.close();
+          }
+        }
+      } catch {}
+    });
+  } catch {}
 }
 
-function sendOnAllChannels(token) {
+function sendOnAllChannels(token: string) {
   try {
     Office.context.ui.messageParent(JSON.stringify({ type: "aad-token", token }));
   } catch {}
@@ -33,9 +42,18 @@ function sendOnAllChannels(token) {
   } catch {}
 }
 
-async function sendTokenAndExit(token) {
+async function sendTokenAndExit(token: string) {
   if (inDialog()) {
     sendOnAllChannels(token);
+
+    setTimeout(() => {
+      if (!ackedByParent) {
+        try {
+          if (Office.context.ui.closeContainer) Office.context.ui.closeContainer();
+          else window.close();
+        } catch {}
+      }
+    }, 1500);
     return;
   }
   window.location.replace("/taskpane.html");
@@ -44,10 +62,13 @@ async function sendTokenAndExit(token) {
 async function run() {
   await msalReady;
 
-  const res = await msalInstance.handleRedirectPromise();
-  if (res?.account) msalInstance.setActiveAccount(res.account);
+  try {
+    const res = await msalInstance.handleRedirectPromise();
+    if (res?.account) msalInstance.setActiveAccount(res.account);
+  } catch {}
 
   let account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+
   if (!account) {
     await msalInstance.loginRedirect({ scopes: [API_SCOPE], prompt: "select_account" });
     return;
@@ -55,9 +76,34 @@ async function run() {
 
   installAckHandler();
 
-  const tokenRes = await msalInstance.acquireTokenSilent({ scopes: [API_SCOPE], account });
-  await sendTokenAndExit(tokenRes.accessToken);
+  try {
+    const tokenRes = await msalInstance.acquireTokenSilent({ scopes: [API_SCOPE], account });
+    await sendTokenAndExit(tokenRes.accessToken);
+  } catch (e) {
+    if (e instanceof InteractionRequiredAuthError) {
+      await msalInstance.loginRedirect({ scopes: [API_SCOPE], prompt: "select_account" });
+      return;
+    }
+    try {
+      if (inDialog()) {
+        Office.context.ui.messageParent(
+          JSON.stringify({ type: "aad-error", error: String(e?.message || e) })
+        );
+      }
+    } catch {
+    }
+    setTimeout(() => {
+      try {
+        if (Office.context.ui.closeContainer) Office.context.ui.closeContainer();
+        else window.close();
+      } catch {
+      }
+    }, 1500);
+  }
 }
 
-if (window.Office && Office.onReady) Office.onReady().then(run);
-else run();
+if (window.Office && Office.onReady) {
+  Office.onReady().then(run);
+} else {
+  run();
+}
