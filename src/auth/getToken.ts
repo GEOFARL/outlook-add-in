@@ -1,5 +1,5 @@
 import { AccountInfo } from "@azure/msal-browser";
-import { getCachedToken, setCachedToken } from "./dialogAuth";
+import { getCachedTokenAsync, seedTokenFromOfficeStorage, setCachedToken } from "./dialogAuth";
 import { API_SCOPE, msalInstance, msalReady } from "./msal";
 
 const request = { scopes: [API_SCOPE] as string[] };
@@ -19,12 +19,13 @@ function jwtExpSeconds(jwt: string): number {
 }
 
 export async function getApiAccessToken(): Promise<string> {
-  const cached = getCachedToken();
+  await seedTokenFromOfficeStorage();
+
+  const cached = await getCachedTokenAsync();
   const now = Math.floor(Date.now() / 1000);
   if (cached && jwtExpSeconds(cached) > now + 120) return cached;
 
   await msalReady;
-
   const acc = activeAccount();
   if (acc) {
     try {
@@ -33,13 +34,13 @@ export async function getApiAccessToken(): Promise<string> {
         account: acc,
         forceRefresh: !cached || jwtExpSeconds(cached) <= now + 120,
       });
-      setCachedToken(res.accessToken);
+      await setCachedToken(res.accessToken);
       return res.accessToken;
     } catch {}
   }
 
   const { acquireTokenViaDialog } = await import("./dialogAuth");
   const t = await acquireTokenViaDialog();
-  setCachedToken(t);
+  await setCachedToken(t);
   return t;
 }

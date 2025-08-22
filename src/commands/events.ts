@@ -1,4 +1,4 @@
-import { seedTokenFromOfficeStorage, getCachedToken } from "../auth/dialogAuth";
+import { getCachedTokenAsync, seedTokenFromOfficeStorage } from "../auth/dialogAuth";
 import { tenantIdFromJwt } from "../auth/claims";
 import { MLRedactApiClient } from "../taskpane/api/mlRedactApiClient";
 import { normalizeAxiosError } from "../shared/errors";
@@ -12,7 +12,7 @@ Office.onReady(async () => {
 async function onMessageSend(event: Office.AddinCommands.Event) {
   const alert = (msg: string) => smartAlert(event, msg);
   try {
-    const token = getCachedToken();
+    const token = await getCachedTokenAsync();
     if (!token) return alert("Please open ML-Redact and sign in before sending.");
 
     const [subject, bodyHtml, recipients] = await Promise.all([
