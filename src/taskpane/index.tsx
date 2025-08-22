@@ -8,10 +8,8 @@ const root = rootElement ? createRoot(rootElement) : undefined;
 
 Office.onReady(async () => {
   try {
-    await getApiAccessToken({ noUI: true }); // silent warm-up
-  } catch {
-    // ignore; user will see the dialog the first time they *manually* run the feature
-  }
+    await getApiAccessToken();
+  } catch {}
   root?.render(<App />);
 });
 

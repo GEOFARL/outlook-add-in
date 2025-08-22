@@ -3,6 +3,7 @@ import { MLRedactApiClient } from "../api/mlRedactApiClient";
 import { getRecipients } from "../utils/get-recipients";
 import { getApiAccessToken } from "../../auth/getToken";
 import { classifyAxiosError, decodeJwtPayload, quickCorsProbe } from "../utils/net-diagnostics";
+import { tenantIdFromJwt } from "../../auth/claims";
 
 const apiClient = new MLRedactApiClient("25f4389cf52441e0b16c6adc466c0c5b", getApiAccessToken);
 
@@ -100,11 +101,15 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
         set({ progress: i });
       }
 
+      const token = await getApiAccessToken();
+      const tenantId = tenantIdFromJwt(token) || "T3";
+
       const response = await apiClient.processMessage({
         messageId: `msg-${Date.now()}`,
-        tenantId: "T2",
+        tenantId: tenantId || "T3",
+        // tenantId: "T3",
         utcTimestamp: now,
-        triggerType: "onSend",
+        triggerType: "manual",
         subject,
         body,
         actionsRequested: [
@@ -151,6 +156,7 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
       }
 
       let errorDetails = "";
+      const tenantId = tenantIdFromJwt(await getApiAccessToken()) || "T3";
 
       if (err.response) {
         errorDetails = `
@@ -165,6 +171,7 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
     JWT (tid): ${tid || "N/A"}
     JWT (sub): ${sub || "N/A"}
     ${probeText}
+    Tenant ID: ${tenantId}
     `.trim();
       } else if (err.request) {
         errorDetails = `
@@ -178,6 +185,7 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
     JWT (tid): ${tid || "N/A"}
     JWT (sub): ${sub || "N/A"}
     ${probeText}
+    Tenant ID: ${tenantId}
     `.trim();
       } else {
         errorDetails = `
@@ -186,6 +194,7 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
     Stack: ${err.stack || "N/A"}
     Classification: ${classification.kind} — ${classification.hint}
     ${probeText}
+    Tenant ID: ${tenantId}
     `.trim();
       }
 

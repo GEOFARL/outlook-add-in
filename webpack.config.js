@@ -1,4 +1,5 @@
 /* eslint-disable no-undef */
+const path = require("path");
 
 const devCerts = require("office-addin-dev-certs");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
@@ -30,9 +31,11 @@ module.exports = async (env, options) => {
       },
       auth: "./src/taskpane/auth.ts",
       commands: "./src/commands/commands.ts",
+      events: "./src/commands/events.ts",
     },
     output: {
       clean: true,
+      publicPath: "/",
     },
     resolve: {
       extensions: [".ts", ".tsx", ".html", ".js"],
@@ -53,8 +56,19 @@ module.exports = async (env, options) => {
         },
         {
           test: /\.html$/,
-          exclude: /node_modules/,
-          use: "html-loader",
+          oneOf: [
+            {
+              include: [path.resolve(__dirname, "src/commands/commands.html")],
+              use: {
+                loader: "html-loader",
+                options: { sources: false },
+              },
+            },
+            {
+              exclude: /node_modules/,
+              use: "html-loader",
+            },
+          ],
         },
         {
           test: /\.(png|jpg|jpeg|ttf|woff|woff2|gif|ico)$/,
@@ -100,6 +114,7 @@ module.exports = async (env, options) => {
         filename: "commands.html",
         template: "./src/commands/commands.html",
         chunks: ["polyfill", "commands"],
+        inject: "body",
       }),
       new webpack.ProvidePlugin({
         Promise: ["es6-promise", "Promise"],

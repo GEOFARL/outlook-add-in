@@ -1,7 +1,6 @@
-import { AccountInfo, InteractionRequiredAuthError } from "@azure/msal-browser";
-import { msalInstance, msalReady, API_SCOPE } from "./msal";
-import { acquireTokenViaDialog, getCachedToken, setCachedToken } from "./dialogAuth";
-import { DBG } from "./debug";
+import { AccountInfo } from "@azure/msal-browser";
+import { getCachedToken, setCachedToken } from "./dialogAuth";
+import { API_SCOPE, msalInstance, msalReady } from "./msal";
 
 const request = { scopes: [API_SCOPE] as string[] };
 
@@ -9,59 +8,38 @@ function activeAccount(): AccountInfo | null {
   return msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0] || null;
 }
 
-let refreshTimer: number | null = null;
-function scheduleSilentRefresh(expSeconds: number) {
+function jwtExpSeconds(jwt: string): number {
   try {
-    if (refreshTimer) window.clearTimeout(refreshTimer as any);
-  } catch {}
-  const msUntilRefresh = Math.max(expSeconds * 1000 - Date.now() - 5 * 60 * 1000, 15_000);
-  refreshTimer = window.setTimeout(async () => {
-    try {
-      const acc = activeAccount();
-      if (!acc) return;
-      const res = await msalInstance.acquireTokenSilent({
-        ...request,
-        account: acc,
-        forceRefresh: true,
-      });
-      setCachedToken(res.accessToken);
-      const exp = Math.floor((res.expiresOn?.getTime() ?? Date.now() + 3600_000) / 1000);
-      scheduleSilentRefresh(exp);
-      DBG.log("Token silently refreshed");
-    } catch (e) {
-      DBG.warn("Background silent refresh failed", e);
-    }
-  }, msUntilRefresh) as any;
+    const [, p] = jwt.split(".");
+    const { exp } = JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/")));
+    return Number(exp) || 0;
+  } catch {
+    return 0;
+  }
 }
 
-export async function getApiAccessToken(opts?: { noUI?: boolean }): Promise<string> {
+export async function getApiAccessToken(): Promise<string> {
   const cached = getCachedToken();
-  if (cached) return cached;
+  const now = Math.floor(Date.now() / 1000);
+  if (cached && jwtExpSeconds(cached) > now + 120) return cached;
 
   await msalReady;
 
-  const account = activeAccount();
-  if (account) {
+  const acc = activeAccount();
+  if (acc) {
     try {
-      DBG.log("acquireTokenSilent start");
-      const res = await msalInstance.acquireTokenSilent({ ...request, account });
+      const res = await msalInstance.acquireTokenSilent({
+        ...request,
+        account: acc,
+        forceRefresh: !cached || jwtExpSeconds(cached) <= now + 120,
+      });
       setCachedToken(res.accessToken);
-      const exp = Math.floor((res.expiresOn?.getTime() ?? Date.now() + 3600_000) / 1000);
-      scheduleSilentRefresh(exp);
-      DBG.log("acquireTokenSilent ok");
       return res.accessToken;
-    } catch (e) {
-      DBG.warn("acquireTokenSilent failed", e);
-      if (!(e instanceof InteractionRequiredAuthError)) throw e;
-    }
+    } catch {}
   }
 
-  if (opts?.noUI) {
-    throw new Error("No cached token and UI disabled");
-  }
-  DBG.log("Falling back to dialog auth");
+  const { acquireTokenViaDialog } = await import("./dialogAuth");
   const t = await acquireTokenViaDialog();
   setCachedToken(t);
-  DBG.log("Dialog returned token");
   return t;
 }
