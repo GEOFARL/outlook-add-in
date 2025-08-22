@@ -1,6 +1,7 @@
 import { seedTokenFromOfficeStorage, getCachedToken } from "../auth/dialogAuth";
 import { tenantIdFromJwt } from "../auth/claims";
 import { MLRedactApiClient } from "../taskpane/api/mlRedactApiClient";
+import { normalizeAxiosError } from "../shared/errors";
 import { getRecipients } from "../taskpane/utils/get-recipients";
 
 Office.onReady(async () => {
@@ -9,11 +10,10 @@ Office.onReady(async () => {
 });
 
 async function onMessageSend(event: Office.AddinCommands.Event) {
+  const alert = (msg: string) => smartAlert(event, msg);
   try {
     const token = getCachedToken();
-    if (!token) {
-      return smartAlert(event, "Please open ML-Redact and sign in before sending.");
-    }
+    if (!token) return alert("Please open ML-Redact and sign in before sending.");
 
     const [subject, bodyHtml, recipients] = await Promise.all([
       getSubject(),
@@ -22,10 +22,10 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
     ]);
 
     const api = new MLRedactApiClient("25f4389cf52441e0b16c6adc466c0c5b", async () => token);
+
     const resp = await api.processMessage({
-      messageId: `guid-${Date.now()}-${Math.floor(Math.random() * 1e9)}`,
+      messageId: crypto?.randomUUID?.() ?? `guid-${Date.now()}`,
       tenantId: tenantIdFromJwt(token) || "T3",
-      // tenantId: "T3",
       utcTimestamp: new Date().toISOString(),
       triggerType: "onSend",
       subject,
@@ -43,13 +43,12 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
     if (resp.UpdatedBody && resp.UpdatedBody !== bodyHtml) ops.push(setBodyHtml(resp.UpdatedBody));
     if (ops.length) await Promise.all(ops);
 
-    if (resp.ReqConfirm) {
-      return smartAlert(event, "Review is recommended by your organization.");
-    }
+    if (resp.ReqConfirm) return alert("Review is recommended by your organization.");
 
     event.completed({ allowEvent: true });
-  } catch {
-    smartAlert(event, "ML-Redact temporarily unavailable. Review before sending?");
+  } catch (e) {
+    const n = normalizeAxiosError(e);
+    return alert(n.userMessage);
   }
 }
 

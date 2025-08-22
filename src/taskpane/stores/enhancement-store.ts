@@ -2,8 +2,8 @@ import { create } from "zustand";
 import { MLRedactApiClient } from "../api/mlRedactApiClient";
 import { getRecipients } from "../utils/get-recipients";
 import { getApiAccessToken } from "../../auth/getToken";
-import { classifyAxiosError, decodeJwtPayload, quickCorsProbe } from "../utils/net-diagnostics";
 import { tenantIdFromJwt } from "../../auth/claims";
+import { normalizeAxiosError } from "../../shared/errors";
 
 const apiClient = new MLRedactApiClient("25f4389cf52441e0b16c6adc466c0c5b", getApiAccessToken);
 
@@ -97,7 +97,7 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
 
     try {
       for (let i = 10; i <= 90; i += 20) {
-        await new Promise((r) => setTimeout(r, 150));
+        await new Promise((r) => setTimeout(r, 120));
         set({ progress: i });
       }
 
@@ -106,8 +106,7 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
 
       const response = await apiClient.processMessage({
         messageId: `msg-${Date.now()}`,
-        tenantId: tenantId || "T3",
-        // tenantId: "T3",
+        tenantId,
         utcTimestamp: now,
         triggerType: "manual",
         subject,
@@ -131,74 +130,23 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
         loading: false,
       });
     } catch (err: any) {
-      console.error("Error processing message:", err);
+      const n = normalizeAxiosError(err, {
+        defaultMsg: "Could not process your email right now.",
+      });
 
-      // ✅ classify the error
-      const classification = classifyAxiosError(err);
+      const url = `${err?.config?.baseURL || ""}${err?.config?.url || ""}`;
+      const details = `Kind: ${n.code}${n.status ? `  Status: ${n.status}` : ""}${n.correlationId ? `  Correlation: ${n.correlationId}` : ""}
+User Msg: ${n.userMessage}
+Dev Msg: ${n.devMessage || "(none)"}
+URL: ${url || "(unknown)"}
+Axios: ${err?.message || "(no message)"}`;
 
-      // ✅ grab token + decode for helpful hints
-      const authHeader: string | undefined =
-        err?.config?.headers?.Authorization || err?.config?.headers?.authorization;
-      const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
-      const jwt = decodeJwtPayload(token);
-      const aud = jwt?.aud;
-      const tid = jwt?.tid;
-      const sub = jwt?.sub;
-
-      // ✅ run a quick probe so you can SEE something even in desktop Outlook
-      let probeText = "";
-      try {
-        const endpoint = new URL(err?.config?.url ?? "", err?.config?.baseURL ?? "").href;
-        const probe = await quickCorsProbe(endpoint);
-        probeText = `Probe from origin ${probe.origin}:\n- ${probe.notes.join("\n- ")}`;
-      } catch {
-        /* ignore */
-      }
-
-      let errorDetails = "";
-      const tenantId = tenantIdFromJwt(await getApiAccessToken()) || "T3";
-
-      if (err.response) {
-        errorDetails = `
-    Response Error
-    Status: ${err.response.status} ${err.response.statusText}
-    URL: ${err.config?.url || "N/A"}
-    Method: ${err.config?.method || "N/A"}
-    Request Headers: ${JSON.stringify(err.config?.headers || {}, null, 2)}
-    Response Data: ${JSON.stringify(err.response.data, null, 2)}
-    Classification: ${classification.kind} — ${classification.hint}
-    JWT (aud): ${aud || "N/A"}
-    JWT (tid): ${tid || "N/A"}
-    JWT (sub): ${sub || "N/A"}
-    ${probeText}
-    Tenant ID: ${tenantId}
-    `.trim();
-      } else if (err.request) {
-        errorDetails = `
-    No Response Received
-    URL: ${err.config?.url || "N/A"}
-    Method: ${err.config?.method || "N/A"}
-    Request Headers: ${JSON.stringify(err.config?.headers || {}, null, 2)}
-    Message: ${err.message}
-    Classification: ${classification.kind} — ${classification.hint}
-    JWT (aud): ${aud || "N/A"}
-    JWT (tid): ${tid || "N/A"}
-    JWT (sub): ${sub || "N/A"}
-    ${probeText}
-    Tenant ID: ${tenantId}
-    `.trim();
-      } else {
-        errorDetails = `
-    Request Setup Error
-    Message: ${err.message}
-    Stack: ${err.stack || "N/A"}
-    Classification: ${classification.kind} — ${classification.hint}
-    ${probeText}
-    Tenant ID: ${tenantId}
-    `.trim();
-      }
-
-      set({ responseError: errorDetails, loading: false, progress: 0 });
+      set({
+        validationError: n.userMessage,
+        responseError: details,
+        loading: false,
+        progress: 0,
+      });
     }
   },
 
