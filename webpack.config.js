@@ -65,6 +65,13 @@ module.exports = async (env, options) => {
               },
             },
             {
+              include: [path.resolve(__dirname, "src/commands/events.html")],
+              use: {
+                loader: "html-loader",
+                options: { sources: false },
+              },
+            },
+            {
               exclude: /node_modules/,
               use: "html-loader",
             },
@@ -84,6 +91,12 @@ module.exports = async (env, options) => {
         filename: "taskpane.html",
         template: "./src/taskpane/taskpane.html",
         chunks: ["polyfill", "taskpane", "react"],
+      }),
+      new HtmlWebpackPlugin({
+        filename: "events.html",
+        template: "./src/commands/events.html",
+        chunks: ["polyfill", "events"],
+        inject: "body",
       }),
       new HtmlWebpackPlugin({
         filename: "auth.html",
