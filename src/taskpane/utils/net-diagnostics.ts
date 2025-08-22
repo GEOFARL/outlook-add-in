@@ -1,4 +1,3 @@
-// src/utils/net-diagnostics.ts
 export function decodeJwtPayload(token?: string): any | null {
   try {
     if (!token) return null;
@@ -14,7 +13,6 @@ export async function quickCorsProbe(url: string) {
   const origin = window.location.origin;
   const notes: string[] = [];
 
-  // Try a very simple GET (no custom headers). If this fails, it’s connectivity/DNS/TLS.
   try {
     const r = await fetch(url, { method: "GET", mode: "cors" });
     notes.push(`GET ${url} -> ${r.status}`);
@@ -22,8 +20,6 @@ export async function quickCorsProbe(url: string) {
     notes.push(`GET ${url} failed: ${e?.message ?? e}`);
   }
 
-  // Try a "simple" POST with text/plain (no preflight). If this returns a status,
-  // connectivity is fine and your failure is likely due to preflight for non-simple headers.
   try {
     const r = await fetch(url, {
       method: "POST",
@@ -49,7 +45,6 @@ export function classifyAxiosError(err: any) {
     return { kind: "http", status: err.response.status, hint: "Server responded with error." };
   }
   if (err?.request && err?.message?.toLowerCase().includes("network error")) {
-    // Heuristic: network error while sending auth/custom headers => preflight very likely
     if (hasAuth || hasIdem) {
       return {
         kind: "preflight",

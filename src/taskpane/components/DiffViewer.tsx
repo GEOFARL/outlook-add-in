@@ -87,14 +87,12 @@ const DiffViewer: React.FC<Props> = ({ onReject, onConfirm }) => {
     <div className={styles.container}>
       <h3>Review Before Send</h3>
 
-      {/* Subject Section */}
       <div className={styles.section}>
         <h4 className={styles.label}>Subject</h4>
         <div className={`${styles.box} ${styles.originalBox}`}>{renderOriginal(subjectDiff)}</div>
         <div className={`${styles.box} ${styles.changedBox}`}>{renderChanged(subjectDiff)}</div>
       </div>
 
-      {/* Body Section */}
       <div className={styles.section}>
         <h4 className={styles.label}>Body</h4>
         <div className={`${styles.box} ${styles.originalBox}`}>{renderOriginal(bodyDiff)}</div>

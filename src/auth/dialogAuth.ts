@@ -53,7 +53,6 @@ export async function setCachedToken(token: string): Promise<void> {
   try {
     await OfficeRuntime.storage.setItem(STORAGE_KEY, token);
   } catch {}
-  // localStorage is just a best-effort mirror
   try {
     localStorage.setItem(STORAGE_KEY, token);
   } catch {}
