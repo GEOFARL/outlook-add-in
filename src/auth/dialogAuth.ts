@@ -58,49 +58,121 @@ export async function setCachedToken(token: string): Promise<void> {
   } catch {}
 }
 
+function isEventRuntime(): boolean {
+  try {
+    return /\/events\.html$/i.test(window.location.pathname || "");
+  } catch {
+    return false;
+  }
+}
+function dialogHost(isDev: boolean) {
+  return isDev ? "https://localhost:3000" : "https://remarkable-frangipane-cca096.netlify.app";
+}
+function isDevHost() {
+  try {
+    return /localhost:3000$/i.test(window.location.host || "");
+  } catch {
+    return false;
+  }
+}
+function buildAuthUrl(base: string) {
+  const origin = encodeURIComponent(window.location.origin);
+  return `${base}/auth.html?dialog=1&origin=${origin}&v=${Date.now()}`;
+}
+function shouldDisplayInIframe(): boolean {
+  try {
+    const hn = (Office.context as any)?.mailbox?.diagnostics?.hostName || "";
+    return /outlook/i.test(hn);
+  } catch {
+    return false;
+  }
+}
+function dialogErrorToMessage(err: any): string {
+  const code = err?.error?.code ?? err?.code;
+  switch (code) {
+    case 12004:
+      return "Dialog domain not trusted (add to AppDomains).";
+    case 12005:
+      return "Dialog not supported in this context.";
+    case 12007:
+      return "Dialog must be HTTPS / cert not trusted.";
+    default:
+      return "Failed to open auth dialog";
+  }
+}
+
 export async function acquireTokenViaDialog(): Promise<string> {
-  const url = "https://remarkable-frangipane-cca096.netlify.app/auth.html?dialog=1";
-  return new Promise<string>((resolve, reject) => {
-    Office.context.ui.displayDialogAsync(
-      url,
-      { width: 40, height: 60, displayInIframe: false },
-      (result) => {
-        if (result.status !== Office.AsyncResultStatus.Succeeded || !result.value) {
-          return reject(new Error("Failed to open auth dialog"));
+  if (isEventRuntime()) throw new Error("auth:dialog-not-allowed-in-event-runtime");
+
+  const dev = isDevHost();
+  const inIframe = shouldDisplayInIframe();
+
+  const tryOpen = (url: string) =>
+    new Promise<Office.Dialog>((resolve, reject) => {
+      Office.context.ui.displayDialogAsync(
+        url,
+        { width: 40, height: 60, displayInIframe: inIframe },
+        (res) => {
+          if (res.status === Office.AsyncResultStatus.Succeeded && res.value) resolve(res.value);
+          else reject(res);
         }
-        const dialog = result.value;
-        let done = false;
+      );
+    });
 
-        dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg: any) => {
+  let dialog: Office.Dialog | null = null;
+  let lastErr: any = null;
+
+  const localUrl = buildAuthUrl(dialogHost(true));
+  const prodUrl = buildAuthUrl(dialogHost(false));
+
+  try {
+    dialog = await tryOpen(dev ? localUrl : prodUrl);
+  } catch (e) {
+    lastErr = e;
+    const code = e?.error?.code ?? e?.code;
+    const canFallback = dev && (code === 12007 || code === 12004 || code === 12005);
+    if (canFallback) {
+      dialog = await tryOpen(prodUrl);
+    } else {
+      throw new Error(dialogErrorToMessage(e));
+    }
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    let done = false;
+
+    dialog!.addEventHandler(Office.EventType.DialogMessageReceived, async (arg: any) => {
+      try {
+        const msg = JSON.parse(arg?.message || "{}");
+        if (msg?.type === "aad-token" && typeof msg.token === "string") {
+          done = true;
           try {
-            const msg = JSON.parse(arg.message || "{}");
-            if (msg?.type === "aad-token" && typeof msg.token === "string") {
-              done = true;
-              try {
-                dialog.messageChild(JSON.stringify({ type: "ack-close" }));
-              } catch {}
-              try {
-                dialog.close();
-              } catch {}
-              resolve(msg.token);
-            } else if (msg?.type === "aad-error") {
-              try {
-                dialog.close();
-              } catch {}
-              reject(new Error(msg.error || "AAD auth error"));
-            }
-          } catch (e) {
-            try {
-              dialog.close();
-            } catch {}
-            reject(e as Error);
-          }
-        });
-
-        dialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
-          if (!done) reject(new Error("Dialog was closed before sign-in finished."));
-        });
+            await setCachedToken(msg.token);
+          } catch {}
+          try {
+            dialog!.messageChild(JSON.stringify({ type: "ack-close" }));
+          } catch {}
+          try {
+            dialog!.close();
+          } catch {}
+          return resolve(msg.token);
+        }
+        if (msg?.type === "aad-error") {
+          try {
+            dialog!.close();
+          } catch {}
+          return reject(new Error(msg.error || "AAD auth error"));
+        }
+      } catch (e) {
+        try {
+          dialog!.close();
+        } catch {}
+        return reject(e as Error);
       }
-    );
+    });
+
+    dialog!.addEventHandler(Office.EventType.DialogEventReceived, () => {
+      if (!done) reject(new Error("Dialog was closed before sign-in finished."));
+    });
   });
 }

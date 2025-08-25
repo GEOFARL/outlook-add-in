@@ -24,7 +24,23 @@ export type MLRedactResponse = {
 };
 
 function getApiBaseUrl() {
-  return "https://mlredact-apim.azure-api.net/function-mlredact";
+  const explicit =
+    (typeof window !== "undefined" && (window as any).__API_BASE_URL__) ||
+    (typeof process !== "undefined" && process.env && process.env.API_BASE_URL);
+  if (explicit) return explicit;
+
+  const hostIsDev =
+    typeof window !== "undefined" &&
+    typeof window.location?.host === "string" &&
+    /localhost:3000$/i.test(window.location.host);
+
+  const nodeEnv =
+    (typeof process !== "undefined" && process.env && process.env.NODE_ENV) || "production";
+  const isDev = nodeEnv === "development" || hostIsDev;
+
+  return isDev
+    ? "https://localhost:4000/dev-api/function-mlredact"
+    : "https://mlredact-apim.azure-api.net/function-mlredact";
 }
 
 const RETRYABLE_STATUS = new Set([429, 503, 504]);
