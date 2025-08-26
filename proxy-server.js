@@ -23,8 +23,8 @@ app.use(
     secure: false,
     pathRewrite: { "^/dev-api": "" },
     logLevel: "debug",
-    proxyTimeout: 30000, // 30 seconds
-    timeout: 30000, // 30 seconds
+    proxyTimeout: 30000,
+    timeout: 30000,
     onError: (err, req, res) => {
       console.error("Proxy Error:", err.message);
       res.status(500).send("Proxy error: " + err.message);

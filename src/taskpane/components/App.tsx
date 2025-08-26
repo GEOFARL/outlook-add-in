@@ -45,7 +45,7 @@ const App = () => {
   }, [emailBody, setBody]);
 
   const handleConfirm = () => {
-    const formattedHtml = `<p>${responseText.replace(/\n/g, "<br>")}</p>`;
+    const formattedHtml = `<p>${responseText?.replace(/\n/g, "<br>")}</p>`;
 
     Office.context.mailbox.item.body.setAsync(formattedHtml, { coercionType: "html" });
     if (updatedSubject && updatedSubject.trim()) {

@@ -1,14 +1,14 @@
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./components/App";
-import { getApiAccessToken } from "../auth/getToken";
+// import { getApiAccessToken } from "../auth/getToken";
 
 const rootElement = document.getElementById("container");
 const root = rootElement ? createRoot(rootElement) : undefined;
 
 Office.onReady(async () => {
   try {
-    await getApiAccessToken();
+    // await getApiAccessToken();
   } catch {}
   root?.render(<App />);
 });

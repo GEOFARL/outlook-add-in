@@ -1,11 +1,11 @@
 import { create } from "zustand";
+import { ML_REDACT_SUBSCRIPTION_KEY, ML_REDACT_TENANT_ID } from "../../config";
+import { normalizeAxiosError } from "../../shared/errors";
 import { MLRedactApiClient } from "../api/mlRedactApiClient";
 import { getRecipients } from "../utils/get-recipients";
-import { getApiAccessToken } from "../../auth/getToken";
-import { tenantIdFromJwt } from "../../auth/claims";
-import { normalizeAxiosError } from "../../shared/errors";
 
-const apiClient = new MLRedactApiClient("25f4389cf52441e0b16c6adc466c0c5b", getApiAccessToken);
+// const apiClient = new MLRedactApiClient(ML_REDACT_SUBSCRIPTION_KEY, getApiAccessToken);
+const apiClient = new MLRedactApiClient(ML_REDACT_SUBSCRIPTION_KEY);
 
 const redactionOptions = ["Blackout", "<REDACTED>", "Partial mask"] as const;
 type RedactionOption = (typeof redactionOptions)[number];
@@ -101,12 +101,12 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
         set({ progress: i });
       }
 
-      const token = await getApiAccessToken();
-      const tenantId = tenantIdFromJwt(token) || "T3";
+      // const token = await getApiAccessToken();
+      // const tenantId = tenantIdFromJwt(token) || "T3";
 
       const response = await apiClient.processMessage({
         messageId: `msg-${Date.now()}`,
-        tenantId,
+        tenantId: ML_REDACT_TENANT_ID,
         utcTimestamp: now,
         triggerType: "manual",
         subject,
@@ -125,7 +125,7 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
         subject,
         updatedSubject: response.UpdatedSubject,
         responseText: response.UpdatedBody,
-        responseHtml: `<p>${response.UpdatedBody.replace(/\n/g, "<br>")}</p>`,
+        responseHtml: `<p>${response.UpdatedBody?.replace(/\n/g, "<br>")}</p>`,
         progress: 100,
         loading: false,
       });

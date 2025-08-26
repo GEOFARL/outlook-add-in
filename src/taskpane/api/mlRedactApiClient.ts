@@ -50,8 +50,8 @@ export class MLRedactApiClient {
   private http: AxiosInstance;
 
   constructor(
-    subscriptionKey: string,
-    private tokenProvider: () => Promise<string>
+    subscriptionKey: string
+    // private tokenProvider: () => Promise<string>
   ) {
     this.http = axios.create({
       baseURL: getApiBaseUrl(),
@@ -64,12 +64,12 @@ export class MLRedactApiClient {
       withCredentials: false,
     });
 
-    this.http.interceptors.request.use(async (config) => {
-      const token = await this.tokenProvider();
-      config.headers = config.headers || new AxiosHeaders();
-      (config.headers as AxiosHeaders).set("Authorization", `Bearer ${token}`);
-      return config;
-    });
+    // this.http.interceptors.request.use(async (config) => {
+    //   const token = await this.tokenProvider();
+    //   config.headers = config.headers || new AxiosHeaders();
+    //   (config.headers as AxiosHeaders).set("Authorization", `Bearer ${token}`);
+    //   return config;
+    // });
 
     this.http.interceptors.response.use(
       (r) => r,

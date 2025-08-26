@@ -1,19 +1,14 @@
-import {
-  getCachedTokenAsync,
-  seedTokenFromOfficeStorage,
-  setCachedToken,
-} from "../auth/dialogAuth";
-import { tenantIdFromJwt } from "../auth/claims";
-import { MLRedactApiClient } from "../taskpane/api/mlRedactApiClient";
+import { getCachedTokenAsync, setCachedToken } from "../auth/dialogAuth";
+import { API_SCOPE, msalInstance } from "../auth/msal";
+import { ML_REDACT_SUBSCRIPTION_KEY, ML_REDACT_TENANT_ID } from "../config";
 import { normalizeAxiosError } from "../shared/errors";
+import { MLRedactApiClient } from "../taskpane/api/mlRedactApiClient";
 import { getRecipients } from "../taskpane/utils/get-recipients";
-import { msalInstance, API_SCOPE } from "../auth/msal";
 
 const BYPASS_KEY = "mlr_bypass_once";
 const FPR_KEY = "mlr_fpr_v1";
 
 Office.onReady(async () => {
-  await seedTokenFromOfficeStorage();
   Office.actions.associate("onMessageSend", onMessageSend);
 
   try {
@@ -98,14 +93,15 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
     const [subject, recipients] = await Promise.all([getSubject(), getRecipients()]);
     const bodyHtml = await getBodyHtml();
 
-    const token = await getValidAccessToken();
-    if (!token) return alert("Please open ML-Redact and sign in before sending.");
+    // const token = await getValidAccessToken();
+    // if (!token) return alert("Please open ML-Redact and sign in before sending.");
 
-    const api = new MLRedactApiClient("25f4389cf52441e0b16c6adc466c0c5b", tokenProviderStrict);
+    // const api = new MLRedactApiClient("25f4389cf52441e0b16c6adc466c0c5b", tokenProviderStrict);
+    const api = new MLRedactApiClient(ML_REDACT_SUBSCRIPTION_KEY);
 
     const resp = await api.processMessage({
       messageId: crypto?.randomUUID?.() ?? `guid-${Date.now()}`,
-      tenantId: tenantIdFromJwt(token) || "T3",
+      tenantId: ML_REDACT_TENANT_ID,
       utcTimestamp: new Date().toISOString(),
       triggerType: "onSend",
       subject,

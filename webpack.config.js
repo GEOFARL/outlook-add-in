@@ -136,9 +136,7 @@ module.exports = async (env, options) => {
         "process.env.ML_REDACT_SUBSCRIPTION_KEY": JSON.stringify(
           process.env.ML_REDACT_SUBSCRIPTION_KEY || ""
         ),
-        "process.env.ML_REDACT_BEARER_TOKEN": JSON.stringify(
-          process.env.ML_REDACT_BEARER_TOKEN || ""
-        ),
+        "process.env.ML_REDACT_TENANT_ID": JSON.stringify(process.env.ML_REDACT_TENANT_ID || ""),
       }),
     ],
     devServer: {
