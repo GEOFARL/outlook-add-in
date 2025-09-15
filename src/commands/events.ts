@@ -91,7 +91,7 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
     }
 
     const [subject, recipients] = await Promise.all([getSubject(), getRecipients()]);
-    const bodyHtml = await getBodyHtml();
+    const bodyText = await getBodyText();
 
     // const token = await getValidAccessToken();
     // if (!token) return alert("Please open ML-Redact and sign in before sending.");
@@ -105,7 +105,7 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
       utcTimestamp: new Date().toISOString(),
       triggerType: "onSend",
       subject,
-      body: bodyHtml,
+      body: bodyText,
       actionsRequested: [],
       redactionMethod: "",
       userContext: "",
@@ -116,7 +116,7 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
     const ops: Promise<any>[] = [];
     if (resp.UpdatedSubject && resp.UpdatedSubject !== subject)
       ops.push(setSubject(resp.UpdatedSubject));
-    if (resp.UpdatedBody && resp.UpdatedBody !== bodyHtml) ops.push(setBodyHtml(resp.UpdatedBody));
+    if (resp.UpdatedBody && resp.UpdatedBody !== bodyText) ops.push(setBodyText(resp.UpdatedBody));
     if (ops.length) await Promise.all(ops);
 
     const [finalSubject, finalBodyText] = await Promise.all([getSubject(), getBodyText()]);
@@ -142,25 +142,14 @@ const getSubject = () =>
 const setSubject = (v: string) =>
   new Promise<void>((r) => Office.context.mailbox.item.subject.setAsync(v, () => r()));
 
-const getBodyHtml = () =>
-  new Promise<string>((r) =>
-    Office.context.mailbox.item.body.getAsync("html", (x) => r(String(x?.value ?? "")))
-  );
-
 const getBodyText = () =>
   new Promise<string>((r) =>
-    Office.context.mailbox.item.body.getAsync("text", (x) =>
-      r(
-        String(x?.value ?? "")
-          .replace(/\s+/g, " ")
-          .trim()
-      )
-    )
+    Office.context.mailbox.item.body.getAsync("text", (x) => r(String(x?.value ?? "")))
   );
 
-const setBodyHtml = (html: string) =>
+const setBodyText = (text: string) =>
   new Promise<void>((r) =>
-    Office.context.mailbox.item.body.setAsync(html, { coercionType: "html" }, () => r())
+    Office.context.mailbox.item.body.setAsync(text, { coercionType: "text" }, () => r())
   );
 
 function loadCustomProps(): Promise<Office.CustomProperties> {
