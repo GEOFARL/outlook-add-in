@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { ML_REDACT_SUBSCRIPTION_KEY, ML_REDACT_TENANT_ID } from "../../config";
 import { normalizeAxiosError } from "../../shared/errors";
 import { MLRedactApiClient } from "../api/mlRedactApiClient";
-import { getRecipients } from "../utils/get-recipients";
+import { getRecipientsReliable } from "../utils/get-recipients";
 
 // const apiClient = new MLRedactApiClient(ML_REDACT_SUBSCRIPTION_KEY, getApiAccessToken);
 const apiClient = new MLRedactApiClient(ML_REDACT_SUBSCRIPTION_KEY);
@@ -92,7 +92,7 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
     });
 
     const sender = Office.context.mailbox.userProfile.emailAddress ?? "unknown@example.com";
-    const recipients = await getRecipients();
+    const recipients = await getRecipientsReliable();
     const now = new Date().toISOString();
 
     try {

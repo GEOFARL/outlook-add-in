@@ -3,7 +3,7 @@ import { API_SCOPE, msalInstance } from "../auth/msal";
 import { ML_REDACT_SUBSCRIPTION_KEY, ML_REDACT_TENANT_ID } from "../config";
 import { normalizeAxiosError } from "../shared/errors";
 import { MLRedactApiClient } from "../taskpane/api/mlRedactApiClient";
-import { getRecipients } from "../taskpane/utils/get-recipients";
+import { getRecipientsReliable } from "../taskpane/utils/get-recipients";
 
 const BYPASS_KEY = "mlr_bypass_once";
 const FPR_KEY = "mlr_fpr_v1";
@@ -76,7 +76,7 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
       const [subject, bodyText, recipients] = await Promise.all([
         getSubject(),
         getBodyText(),
-        getRecipients(),
+        getRecipientsReliable(),
       ]);
       const currentFpr = fingerprint(subject, bodyText, recipients);
       if (currentFpr === savedFpr) {
@@ -90,7 +90,7 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
       }
     }
 
-    const [subject, recipients] = await Promise.all([getSubject(), getRecipients()]);
+    const [subject, recipients] = await Promise.all([getSubject(), getRecipientsReliable()]);
     const bodyText = await getBodyText();
 
     // const token = await getValidAccessToken();
