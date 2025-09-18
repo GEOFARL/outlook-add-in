@@ -38,6 +38,16 @@ type EnhancementStore = {
   reset: () => void;
 };
 
+const htmlToPlain = (html: string): string => {
+  try {
+    const div = document.createElement("div");
+    div.innerHTML = (html || "").replace(/<br\s*\/?>/gi, "\n");
+    return div.textContent || (div as any).innerText || "";
+  } catch {
+    return html || "";
+  }
+};
+
 export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
   subject: "",
   updatedSubject: "",
@@ -56,7 +66,16 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
   setBody: (body) => set({ body }),
   setProofread: (val) => set({ proofread: val }),
   setRedact: (val) => set({ redact: val }),
-  setRedactionMethod: (val) => set({ redactionMethod: val }),
+  setRedactionMethod: (val) => {
+    try {
+      Office?.context?.roamingSettings?.set("mlr_redaction_method", val);
+      Office?.context?.roamingSettings?.saveAsync?.(() => {});
+    } catch {}
+    try {
+      localStorage.setItem("mlr_redaction_method", val);
+    } catch {}
+    set({ redactionMethod: val });
+  },
   addPrompt: (val) => {
     const prompts = get().prompts;
     if (val && prompts.length < 5 && !prompts.includes(val)) {
@@ -92,7 +111,15 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
     });
 
     const sender = Office.context.mailbox.userProfile.emailAddress ?? "unknown@example.com";
+    const messageId = await new Promise<string>((resolve) =>
+      Office.context.mailbox.item.saveAsync(() =>
+        resolve((Office.context.mailbox.item as any).itemId || `msg-${Date.now()}`)
+      )
+    );
     const recipients = await getRecipientsReliable();
+    const bodyHtml = await new Promise<string>((resolve) =>
+      Office.context.mailbox.item.body.getAsync("html", (res) => resolve(String(res?.value ?? "")))
+    );
     const now = new Date().toISOString();
 
     try {
@@ -105,12 +132,12 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
       // const tenantId = tenantIdFromJwt(token) || "T3";
 
       const response = await apiClient.processMessage({
-        messageId: `msg-${Date.now()}`,
+        messageId,
         tenantId: ML_REDACT_TENANT_ID,
         utcTimestamp: now,
         triggerType: "manual",
         subject,
-        body,
+        body: bodyHtml || body,
         actionsRequested: [
           ...(proofread ? (["Proofread"] as const) : []),
           ...(redact ? (["Redact"] as const) : []),
@@ -121,11 +148,13 @@ export const useEnhancementStore = create<EnhancementStore>((set, get) => ({
         messageSender: sender,
       });
 
+      const updatedHtml = response.UpdatedBody || "";
+      const updatedText = htmlToPlain(updatedHtml);
       set({
         subject,
         updatedSubject: response.UpdatedSubject,
-        responseText: response.UpdatedBody,
-        responseHtml: `<p>${response.UpdatedBody?.replace(/\n/g, "<br>")}</p>`,
+        responseText: updatedText,
+        responseHtml: updatedHtml,
         progress: 100,
         loading: false,
       });

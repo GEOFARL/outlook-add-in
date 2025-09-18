@@ -7,6 +7,7 @@ import { getRecipientsReliable } from "../taskpane/utils/get-recipients";
 
 const BYPASS_KEY = "mlr_bypass_once";
 const FPR_KEY = "mlr_fpr_v1";
+const FAIL_KEY = "mlr_fail_v1";
 
 Office.onReady(async () => {
   Office.actions.associate("onMessageSend", onMessageSend);
@@ -21,6 +22,38 @@ Office.onReady(async () => {
     );
   } catch {}
 });
+
+const getBodyHtml = () =>
+  new Promise<string>((r) =>
+    Office.context.mailbox.item.body.getAsync("html", (x) => r(String(x?.value ?? "")))
+  );
+const setBodyHtml = (html: string) =>
+  new Promise<void>((r) =>
+    Office.context.mailbox.item.body.setAsync(html, { coercionType: "html" }, () => r())
+  );
+
+async function getStableMessageId(): Promise<string> {
+  try {
+    const item: any = Office.context.mailbox.item;
+    await new Promise<void>((r) => item.saveAsync(() => r()));
+    return item.itemId || "";
+  } catch {
+    return `fallback-${Date.now()}`;
+  }
+}
+
+function getUserDefaultMethod(): string {
+  try {
+    const rs = Office.context?.roamingSettings;
+    const v = rs?.get("mlr_redaction_method");
+    if (typeof v === "string" && v) return v;
+  } catch {}
+  try {
+    const v = localStorage.getItem("mlr_redaction_method") || "";
+    return v || "";
+  } catch {}
+  return "";
+}
 
 function decodeJwt<T = any>(jwt: string): T | null {
   try {
@@ -71,18 +104,44 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
     const cp = await loadCustomProps();
     const hasBypass = cp.get(BYPASS_KEY) === "1";
     const savedFpr = cp.get(FPR_KEY) as string | null;
+    const failCount = Number(cp.get(FAIL_KEY) || "0") || 0;
+
+    if (failCount >= 2) {
+      event.completed({ allowEvent: true });
+      return;
+    }
 
     if (hasBypass && savedFpr) {
-      const [subject, bodyText, recipients] = await Promise.all([
+      const [subject, bodyText, bodyHtml, recipients] = await Promise.all([
         getSubject(),
         getBodyText(),
+        getBodyHtml(),
         getRecipientsReliable(),
       ]);
       const currentFpr = fingerprint(subject, bodyText, recipients);
       if (currentFpr === savedFpr) {
         try {
+          const messageId = await getStableMessageId();
+          const userDefaultMethod = getUserDefaultMethod();
+          const api = new MLRedactApiClient(ML_REDACT_SUBSCRIPTION_KEY);
+          await api.processMessage({
+            messageId: (messageId || crypto?.randomUUID?.()) ?? `guid-${Date.now()}`,
+            tenantId: ML_REDACT_TENANT_ID,
+            utcTimestamp: new Date().toISOString(),
+            triggerType: "onSend",
+            subject,
+            body: bodyHtml || bodyText,
+            actionsRequested: [],
+            redactionMethod: userDefaultMethod || "",
+            userContext: "",
+            messageRecipients: recipients,
+            messageSender: Office.context.mailbox.userProfile.emailAddress ?? "",
+          });
+        } catch {}
+        try {
           cp.set(BYPASS_KEY, "");
           cp.set(FPR_KEY, "");
+          cp.set(FAIL_KEY, "");
           cp.saveAsync(() => {});
         } catch {}
         event.completed({ allowEvent: true });
@@ -90,8 +149,14 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
       }
     }
 
-    const [subject, recipients] = await Promise.all([getSubject(), getRecipientsReliable()]);
-    const bodyText = await getBodyText();
+    const [subject, recipients, bodyText, bodyHtml] = await Promise.all([
+      getSubject(),
+      getRecipientsReliable(),
+      getBodyText(),
+      getBodyHtml(),
+    ]);
+    const messageId = await getStableMessageId();
+    const userDefaultMethod = getUserDefaultMethod();
 
     // const token = await getValidAccessToken();
     // if (!token) return alert("Please open ML-Redact and sign in before sending.");
@@ -100,14 +165,14 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
     const api = new MLRedactApiClient(ML_REDACT_SUBSCRIPTION_KEY);
 
     const resp = await api.processMessage({
-      messageId: crypto?.randomUUID?.() ?? `guid-${Date.now()}`,
+      messageId: (messageId || crypto?.randomUUID?.()) ?? `guid-${Date.now()}`,
       tenantId: ML_REDACT_TENANT_ID,
       utcTimestamp: new Date().toISOString(),
       triggerType: "onSend",
       subject,
-      body: bodyText,
+      body: bodyHtml || bodyText,
       actionsRequested: [],
-      redactionMethod: "",
+      redactionMethod: userDefaultMethod || "",
       userContext: "",
       messageRecipients: recipients,
       messageSender: Office.context.mailbox.userProfile.emailAddress ?? "",
@@ -116,7 +181,9 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
     const ops: Promise<any>[] = [];
     if (resp.UpdatedSubject && resp.UpdatedSubject !== subject)
       ops.push(setSubject(resp.UpdatedSubject));
-    if (resp.UpdatedBody && resp.UpdatedBody !== bodyText) ops.push(setBodyText(resp.UpdatedBody));
+    if (resp.UpdatedBody && resp.UpdatedBody !== (bodyHtml || bodyText)) {
+      ops.push(setBodyHtml(resp.UpdatedBody));
+    }
     if (ops.length) await Promise.all(ops);
 
     const [finalSubject, finalBodyText] = await Promise.all([getSubject(), getBodyText()]);
@@ -127,9 +194,25 @@ async function onMessageSend(event: Office.AddinCommands.Event) {
       return alert("Review is recommended by your organization. Click Send again to proceed.");
     }
 
+    try {
+      cp.set(FAIL_KEY, "");
+      cp.saveAsync(() => {});
+    } catch {}
+
     event.completed({ allowEvent: true });
   } catch (e) {
     const n = normalizeAxiosError(e);
+
+    try {
+      const cp = await loadCustomProps();
+      const prev = Number(cp.get(FAIL_KEY) || "0") || 0;
+      const next = prev + 1;
+      cp.set(FAIL_KEY, String(next));
+      cp.saveAsync(() => {});
+      if (next >= 2) {
+        return event.completed({ allowEvent: true });
+      }
+    } catch {}
     return alert(n.userMessage);
   }
 }

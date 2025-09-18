@@ -32,6 +32,7 @@ const App = () => {
     setBody,
     setResponseHtml,
     responseText,
+    responseHtml,
     updatedSubject,
     loading,
     responseError: error,
@@ -45,9 +46,11 @@ const App = () => {
   }, [emailBody, setBody]);
 
   const handleConfirm = () => {
-    const formattedHtml = `<p>${responseText?.replace(/\n/g, "<br>")}</p>`;
+    const htmlToApply =
+      (responseHtml && responseHtml.trim()) ||
+      `<p>${(responseText || "").replace(/\n/g, "<br>")}</p>`;
 
-    Office.context.mailbox.item.body.setAsync(formattedHtml, { coercionType: "html" });
+    Office.context.mailbox.item.body.setAsync(htmlToApply, { coercionType: "html" });
     if (updatedSubject && updatedSubject.trim()) {
       Office.context.mailbox.item.subject.setAsync(updatedSubject, (result) => {
         if (result.status === Office.AsyncResultStatus.Failed) {
@@ -56,7 +59,7 @@ const App = () => {
       });
     }
 
-    setResponseHtml(formattedHtml);
+    setResponseHtml(htmlToApply);
     reset();
   };
 
